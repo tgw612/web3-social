@@ -1,0 +1,60 @@
+[package]
+name = "web3-social-backend"
+version = "0.1.0"
+edition = "2021"
+authors = ["Web3 Social Team"]
+description = "基于web3的社交匿名财富交流平台后端服务"
+
+[dependencies]
+# Web框架
+actix-web = "4.3.1"
+actix-rt = "2.8.0"
+actix-cors = "0.6.4"
+
+# 序列化/反序列化
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 数据库
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+
+# Web3相关
+ethers = { version = "2.0", features = ["rustls"] }
+web3 = "0.19.0"
+solana-client = "1.16.0"
+solana-sdk = "1.16.0"
+
+# 加密和安全
+jsonwebtoken = "8.3"
+sha2 = "0.10"
+hex = "0.4"
+rand = "0.8"
+
+# 存储相关
+ipfs-api-backend-hyper = "0.6" # IPFS交互
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# 缓存
+redis = { version = "0.23.0", features = ["tokio-comp"] }
+
+# 日志和配置
+log = "0.4"
+env_logger = "0.10"
+dotenv = "0.15"
+config = "0.13"
+
+# 实用工具
+chrono = { version = "0.4", features = ["serde"] }
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1.4", features = ["v4", "serde"] }
+async-trait = "0.1"
+futures = "0.3"
+thiserror = "1.0"
+lazy_static = "1.4"
+
+# 可选：AI内容过滤
+rust-bert = "0.20.0"
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockito = "1.1" 
