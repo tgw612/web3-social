@@ -12,4 +12,17 @@ pub async fn not_found() -> HttpResponse {
         "status": "error",
         "message": "Resource not found"
     }))
+}
+
+// API路由配置
+pub fn config(cfg: &mut web::ServiceConfig) {
+    // 配置所有API路由
+    auth::config(cfg);
+    user::config(cfg);
+    asset::config(cfg);
+    post::config(cfg);
+    comment::config(cfg);
+    
+    // 添加默认404处理
+    cfg.default_service(web::route().to(not_found));
 } 
