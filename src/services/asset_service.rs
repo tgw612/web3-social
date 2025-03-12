@@ -3,13 +3,15 @@ use crate::blockchain::solana::SolanaClient;
 use crate::models::asset::{Asset, AssetType, TokenBalance, NftAsset};
 use crate::utils::error::ServiceError;
 use ethers::prelude::*;
-use sqlx::{Pool, Postgres};
+use diesel::prelude::*;
+use diesel::pg::PgConnection;
 use std::sync::Arc;
+use std::sync::Mutex;
 use redis::Client as RedisClient;
 
 /// 资产服务，处理多链资产聚合和展示
 pub struct AssetService {
-    db: Pool<Postgres>,
+    db: Arc<Mutex<PgConnection>>,
     redis: Arc<RedisClient>,
     eth_client: Arc<EthClient>,
     solana_client: Arc<SolanaClient>,
@@ -17,7 +19,7 @@ pub struct AssetService {
 
 impl AssetService {
     pub fn new(
-        db: Pool<Postgres>,
+        db: Arc<Mutex<PgConnection>>,
         redis: Arc<RedisClient>,
         eth_client: Arc<EthClient>,
         solana_client: Arc<SolanaClient>,
@@ -48,18 +50,11 @@ impl AssetService {
 
     /// 从数据库获取已缓存的资产
     async fn get_cached_assets(&self, wallet_address: &str) -> Result<Vec<Asset>, ServiceError> {
-        // 从数据库中获取用户资产
-        let assets = sqlx::query_as!(
-            Asset,
-            r#"
-            SELECT * FROM assets 
-            WHERE wallet_address = $1
-            ORDER BY value_usd DESC
-            "#,
-            wallet_address
-        )
-        .fetch_all(&self.db)
-        .await?;
+        use crate::schema::assets::dsl::*;
+        let conn = self.db.lock().unwrap();
+        let assets = assets.filter(wallet_address.eq(wallet_address))
+            .order(value_usd.desc())
+            .load::<Asset>(&*conn)?;
 
         Ok(assets)
     }
@@ -158,35 +153,15 @@ impl AssetService {
 
     /// 保存资产到数据库
     async fn save_asset(&self, wallet_address: &str, asset: &Asset) -> Result<(), ServiceError> {
-        sqlx::query!(
-            r#"
-            INSERT INTO assets (
-                wallet_address, chain_id, asset_type, symbol, name, 
-                contract_address, balance, decimals, price_usd, value_usd
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            ON CONFLICT (wallet_address, chain_id, contract_address) 
-            DO UPDATE SET 
-                balance = $7,
-                price_usd = $9,
-                value_usd = $10,
-                updated_at = NOW()
-            "#,
-            wallet_address,
-            asset.chain_id,
-            asset.asset_type as AssetType,
-            asset.symbol,
-            asset.name,
-            asset.contract_address,
-            asset.balance,
-            asset.decimals,
-            asset.price_usd,
-            asset.value_usd
-        )
-        .execute(&self.db)
-        .await?;
-
-        Ok(())
+        use crate::schema::assets::dsl::*;
+        let conn = self.db.lock().unwrap();
+        diesel::insert_into(assets)
+            .values((wallet_address.eq(wallet_address), chain_id.eq(asset.chain_id), asset_type.eq(asset.asset_type), symbol.eq(asset.symbol), name.eq(asset.name), contract_address.eq(asset.contract_address), balance.eq(asset.balance), decimals.eq(asset.decimals), price_usd.eq(asset.price_usd), value_usd.eq(asset.value_usd)))
+            .on_conflict((wallet_address, chain_id, contract_address))
+            .do_update()
+            .set((balance.eq(asset.balance), price_usd.eq(asset.price_usd), value_usd.eq(asset.value_usd), updated_at.eq(diesel::dsl::now)))
+            .execute(&*conn)
+            .map_err(|_| ServiceError::InternalServerError)
     }
 
     /// 获取特定代币余额
@@ -203,19 +178,11 @@ impl AssetService {
 
     /// 获取用户NFT资产
     pub async fn get_user_nfts(&self, wallet_address: &str) -> Result<Vec<NftAsset>, ServiceError> {
-        // 从数据库获取已缓存的NFT
-        let nfts = sqlx::query_as!(
-            NftAsset,
-            r#"
-            SELECT * FROM nft_assets 
-            WHERE wallet_address = $1
-            "#,
-            wallet_address
-        )
-        .fetch_all(&self.db)
-        .await?;
+        use crate::schema::nft_assets::dsl::*;
+        let conn = self.db.lock().unwrap();
+        let nfts = nft_assets.filter(wallet_address.eq(wallet_address))
+            .load::<NftAsset>(&*conn)?;
 
-        // 如果缓存不存在或已过期，则从链上重新获取
         if nfts.is_empty() {
             // 获取以太坊NFT
             let eth_nfts = self.eth_client.get_nfts(wallet_address).await?;
@@ -241,49 +208,25 @@ impl AssetService {
 
     /// 保存NFT到数据库
     async fn save_nft(&self, wallet_address: &str, nft: &NftAsset) -> Result<(), ServiceError> {
-        sqlx::query!(
-            r#"
-            INSERT INTO nft_assets (
-                wallet_address, chain_id, contract_address, token_id, 
-                name, image_url, metadata_url
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (wallet_address, chain_id, contract_address, token_id) 
-            DO UPDATE SET 
-                name = $5,
-                image_url = $6,
-                metadata_url = $7,
-                updated_at = NOW()
-            "#,
-            wallet_address,
-            nft.chain_id,
-            nft.contract_address,
-            nft.token_id,
-            nft.name,
-            nft.image_url,
-            nft.metadata_url
-        )
-        .execute(&self.db)
-        .await?;
-
-        Ok(())
+        use crate::schema::nft_assets::dsl::*;
+        let conn = self.db.lock().unwrap();
+        diesel::insert_into(nft_assets)
+            .values((wallet_address.eq(wallet_address), chain_id.eq(nft.chain_id), contract_address.eq(nft.contract_address), token_id.eq(nft.token_id), name.eq(nft.name), image_url.eq(nft.image_url), metadata_url.eq(nft.metadata_url)))
+            .on_conflict((wallet_address, chain_id, contract_address, token_id))
+            .do_update()
+            .set((name.eq(nft.name), image_url.eq(nft.image_url), metadata_url.eq(nft.metadata_url), updated_at.eq(diesel::dsl::now)))
+            .execute(&*conn)
+            .map_err(|_| ServiceError::InternalServerError)
     }
 
     /// 获取用户资产总价值（美元）
     pub async fn get_total_value(&self, wallet_address: &str) -> Result<f64, ServiceError> {
-        // 计算所有资产总价值
-        let total = sqlx::query!(
-            r#"
-            SELECT COALESCE(SUM(value_usd), 0) as total
-            FROM assets 
-            WHERE wallet_address = $1
-            "#,
-            wallet_address
-        )
-        .fetch_one(&self.db)
-        .await?
-        .total
-        .unwrap_or(0.0);
+        use crate::schema::assets::dsl::*;
+        let conn = self.db.lock().unwrap();
+        let total: f64 = assets.filter(wallet_address.eq(wallet_address))
+            .select(diesel::dsl::sum(value_usd))
+            .first(&*conn)
+            .unwrap_or(0.0);
 
         Ok(total)
     }

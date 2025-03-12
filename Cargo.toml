@@ -16,7 +16,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 # 数据库
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+# diesel = { version = "1.4.8", features = ["postgres", "r2d2", "chrono", "uuid"] }
 
 # Web3相关
 ethers = { version = "2.0", features = ["rustls"] }
@@ -45,16 +45,16 @@ config = "0.13"
 
 # 实用工具
 chrono = { version = "0.4", features = ["serde"] }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1.25", features = ["full"] }
 uuid = { version = "1.4", features = ["v4", "serde"] }
 async-trait = "0.1"
 futures = "0.3"
 thiserror = "1.0"
 lazy_static = "1.4"
+base64 = "0.21.0"
 
 # 可选：AI内容过滤
 rust-bert = "0.20.0"
 
 [dev-dependencies]
 tokio-test = "0.4"
-mockito = "1.1" 

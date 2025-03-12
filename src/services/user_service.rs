@@ -2,16 +2,18 @@ use crate::models::user::{User, UserProfile};
 use crate::utils::jwt;
 use crate::utils::error::ServiceError;
 use ethers::signers::Signer;
-use sqlx::{Pool, Postgres};
+use diesel::prelude::*;
+use diesel::pg::PgConnection;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 /// 用户服务，处理用户身份和资料管理
 pub struct UserService {
-    db: Pool<Postgres>,
+    db: Arc<Mutex<PgConnection>>,
 }
 
 impl UserService {
-    pub fn new(db: Pool<Postgres>) -> Self {
+    pub fn new(db: Arc<Mutex<PgConnection>>) -> Self {
         Self { db }
     }
 
@@ -60,37 +62,19 @@ impl UserService {
 
     /// 查找或创建用户
     async fn find_or_create_user(&self, wallet_address: &str, chain_type: &str) -> Result<User, ServiceError> {
-        // 查询用户
-        let user = sqlx::query_as!(
-            User,
-            r#"
-            SELECT * FROM users 
-            WHERE wallet_address = $1 AND chain_type = $2
-            "#,
-            wallet_address,
-            chain_type
-        )
-        .fetch_optional(&self.db)
-        .await?;
+        use crate::schema::users::dsl::*;
+        let conn = self.db.lock().unwrap();
+        let user = users.filter(wallet_address.eq(wallet_address).and(chain_type.eq(chain_type)))
+            .first::<User>(&*conn)
+            .optional()?;
 
-        // 如果用户不存在，创建新用户
         if let Some(user) = user {
             Ok(user)
         } else {
-            let user = sqlx::query_as!(
-                User,
-                r#"
-                INSERT INTO users (wallet_address, chain_type)
-                VALUES ($1, $2)
-                RETURNING *
-                "#,
-                wallet_address,
-                chain_type
-            )
-            .fetch_one(&self.db)
-            .await?;
-
-            Ok(user)
+            diesel::insert_into(users)
+                .values((wallet_address.eq(wallet_address), chain_type.eq(chain_type)))
+                .get_result(&*conn)
+                .map_err(|_| ServiceError::InternalServerError)?
         }
     }
 
@@ -102,65 +86,36 @@ impl UserService {
         nickname: Option<String>,
         avatar_cid: Option<String>,
     ) -> Result<UserProfile, ServiceError> {
-        // 检查用户名是否已存在
+        use crate::schema::user_profiles::dsl::*;
+        let conn = self.db.lock().unwrap();
+
         if let Some(username) = &username {
-            let exists = sqlx::query!(
-                r#"
-                SELECT COUNT(*) as count FROM user_profiles 
-                WHERE username = $1 AND user_id != $2
-                "#,
-                username,
-                user_id
-            )
-            .fetch_one(&self.db)
-            .await?
-            .count
-            .unwrap_or(0) > 0;
+            let exists = user_profiles.filter(username.eq(username).and(user_id.ne(user_id)))
+                .count()
+                .get_result::<i64>(&*conn)? > 0;
 
             if exists {
                 return Err(ServiceError::BadRequest("用户名已存在".into()));
             }
         }
 
-        // 更新用户资料
-        let profile = sqlx::query_as!(
-            UserProfile,
-            r#"
-            INSERT INTO user_profiles (user_id, username, nickname, avatar_cid)
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT (user_id) 
-            DO UPDATE SET 
-                username = COALESCE($2, user_profiles.username),
-                nickname = COALESCE($3, user_profiles.nickname),
-                avatar_cid = COALESCE($4, user_profiles.avatar_cid),
-                updated_at = NOW()
-            RETURNING *
-            "#,
-            user_id,
-            username,
-            nickname,
-            avatar_cid
-        )
-        .fetch_one(&self.db)
-        .await?;
-
-        Ok(profile)
+        diesel::insert_into(user_profiles)
+            .values((user_id.eq(user_id), username.eq(username), nickname.eq(nickname), avatar_cid.eq(avatar_cid)))
+            .on_conflict(user_id)
+            .do_update()
+            .set((username.eq(username), nickname.eq(nickname), avatar_cid.eq(avatar_cid), updated_at.eq(diesel::dsl::now)))
+            .get_result(&*conn)
+            .map_err(|_| ServiceError::InternalServerError)
     }
 
     /// 获取用户资料
     pub async fn get_profile(&self, user_id: i32) -> Result<UserProfile, ServiceError> {
-        let profile = sqlx::query_as!(
-            UserProfile,
-            r#"
-            SELECT * FROM user_profiles WHERE user_id = $1
-            "#,
-            user_id
-        )
-        .fetch_optional(&self.db)
-        .await?
-        .ok_or(ServiceError::NotFound("用户资料不存在".into()))?;
-
-        Ok(profile)
+        use crate::schema::user_profiles::dsl::*;
+        let conn = self.db.lock().unwrap();
+        user_profiles.filter(user_id.eq(user_id))
+            .first::<UserProfile>(&*conn)
+            .optional()
+            .map_err(|_| ServiceError::NotFound("用户资料不存在".into()))
     }
 
     /// 通过用户名获取用户资料

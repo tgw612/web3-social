@@ -1,17 +1,19 @@
 use crate::models::content::{Post, Comment, Like, Tag};
 use crate::services::storage_service::StorageService;
 use crate::utils::error::ServiceError;
-use sqlx::{Pool, Postgres};
+use diesel::prelude::*;
+use diesel::pg::PgConnection;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 /// 内容服务，处理发帖、评论、点赞等社交功能
 pub struct ContentService {
-    db: Pool<Postgres>,
+    db: Arc<Mutex<PgConnection>>,
     storage_service: Arc<StorageService>,
 }
 
 impl ContentService {
-    pub fn new(db: Pool<Postgres>, storage_service: Arc<StorageService>) -> Self {
+    pub fn new(db: Arc<Mutex<PgConnection>>, storage_service: Arc<StorageService>) -> Self {
         Self { db, storage_service }
     }
 
@@ -35,25 +37,12 @@ impl ContentService {
         let content_id = self.storage_service.upload_to_arweave(content.as_bytes()).await?;
 
         // 在数据库中创建帖子
-        let post = sqlx::query_as!(
-            Post,
-            r#"
-            INSERT INTO posts (
-                user_id, wallet_address, content, content_arweave_id,
-                image_ipfs_cid, tx_hash
-            )
-            VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING *
-            "#,
-            user_id,
-            wallet_address,
-            content,
-            content_id,
-            image_cid,
-            tx_hash
-        )
-        .fetch_one(&self.db)
-        .await?;
+        use crate::schema::posts::dsl::*;
+        let conn = self.db.lock().unwrap();
+        let post = diesel::insert_into(posts)
+            .values((user_id.eq(user_id), wallet_address.eq(wallet_address), content.eq(content), content_arweave_id.eq(content_id), image_ipfs_cid.eq(image_cid), tx_hash.eq(tx_hash)))
+            .get_result(&*conn)
+            .map_err(|_| ServiceError::InternalServerError)?;
 
         // 处理标签
         for tag in tags {
@@ -61,16 +50,10 @@ impl ContentService {
             let tag_id = self.get_or_create_tag(&tag).await?;
             
             // 关联帖子和标签
-            sqlx::query!(
-                r#"
-                INSERT INTO post_tags (post_id, tag_id)
-                VALUES ($1, $2)
-                "#,
-                post.id,
-                tag_id
-            )
-            .execute(&self.db)
-            .await?;
+            diesel::insert_into(post_tags)
+                .values((post_id.eq(post.id), tag_id.eq(tag_id)))
+                .execute(&*conn)
+                .map_err(|_| ServiceError::InternalServerError)?;
         }
 
         Ok(post)
@@ -78,31 +61,18 @@ impl ContentService {
 
     /// 获取或创建标签
     async fn get_or_create_tag(&self, tag_name: &str) -> Result<i32, ServiceError> {
-        // 查询标签是否存在
-        let tag = sqlx::query!(
-            r#"
-            SELECT id FROM tags 
-            WHERE name = $1
-            "#,
-            tag_name
-        )
-        .fetch_optional(&self.db)
-        .await?;
+        use crate::schema::tags::dsl::*;
+        let conn = self.db.lock().unwrap();
+        let tag = tags.filter(name.eq(tag_name))
+            .first::<Tag>(&*conn)
+            .optional()?;
 
-        // 如果标签不存在，创建新标签
         if let Some(tag) = tag {
             Ok(tag.id)
         } else {
-            let tag = sqlx::query!(
-                r#"
-                INSERT INTO tags (name)
-                VALUES ($1)
-                RETURNING id
-                "#,
-                tag_name
-            )
-            .fetch_one(&self.db)
-            .await?;
+            let tag = diesel::insert_into(tags)
+                .values(name.eq(tag_name))
+                .get_result::<Tag>(&*conn)?;
 
             Ok(tag.id)
         }
@@ -110,30 +80,17 @@ impl ContentService {
 
     /// 按热度获取帖子列表
     pub async fn get_posts_by_hot(&self, page: i32, page_size: i32) -> Result<Vec<Post>, ServiceError> {
+        use crate::schema::posts::dsl::*;
+        let conn = self.db.lock().unwrap();
         let offset = (page - 1) * page_size;
-        
-        let posts = sqlx::query_as!(
-            Post,
-            r#"
-            SELECT p.* FROM posts p
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) as like_count 
-                FROM likes 
-                GROUP BY post_id
-            ) l ON p.id = l.post_id
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) as comment_count 
-                FROM comments 
-                GROUP BY post_id
-            ) c ON p.id = c.post_id
-            ORDER BY (COALESCE(l.like_count, 0) + COALESCE(c.comment_count, 0) * 2) DESC, p.created_at DESC
-            LIMIT $1 OFFSET $2
-            "#,
-            page_size,
-            offset
-        )
-        .fetch_all(&self.db)
-        .await?;
+
+        let posts = posts
+            .left_join(likes.on(posts.id.eq(likes.post_id)))
+            .left_join(comments.on(posts.id.eq(comments.post_id)))
+            .order((diesel::dsl::sql::<diesel::sql_types::BigInt>("COALESCE(like_count, 0) + COALESCE(comment_count, 0) * 2 DESC"), created_at.desc()))
+            .limit(page_size.into())
+            .offset(offset.into())
+            .load::<Post>(&*conn)?;
 
         Ok(posts)
     }
