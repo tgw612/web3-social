@@ -2,16 +2,17 @@ use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
 use dotenv::dotenv;
 use log::info;
-use sqlx::postgres::PgPoolOptions;
+use diesel::prelude::*;
+use diesel::pg::PgConnection;
 use std::env;
 
 mod api;
 mod blockchain;
-mod config;
 mod middlewares;
 mod models;
 mod services;
 mod utils;
+pub mod schema;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -25,12 +26,9 @@ async fn main() -> std::io::Result<()> {
     let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
     let server_url = format!("{}:{}", host, port);
     
-    // 创建数据库连接池
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&database_url)
-        .await
-        .expect("Failed to create database connection pool");
+    // 创建数据库连接
+    let connection = PgConnection::establish(&database_url)
+        .expect(&format!("Error connecting to {}", database_url));
     
     info!("Starting server at: {}", server_url);
     
@@ -51,7 +49,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(middleware::Logger::default())
             .wrap(cors)
-            .app_data(web::Data::new(pool.clone()))
+            .app_data(web::Data::new(connection.clone()))
             .app_data(redis_pool.clone())
             // 注册API路由
             .configure(api::user::config)

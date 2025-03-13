@@ -9,14 +9,14 @@ description = "基于web3的社交匿名财富交流平台后端服务"
 # Web框架
 actix-web = "4.3.1"
 actix-rt = "2.8.0"
-actix-cors = "0.6.4"
+actix-cors = "0.7.1"
 
 # 序列化/反序列化
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 # 数据库
-# diesel = { version = "1.4.8", features = ["postgres", "r2d2", "chrono", "uuid"] }
+diesel = { version = "2.1.0", features = ["postgres", "r2d2", "chrono", "uuid"] }
 
 # Web3相关
 ethers = { version = "2.0.13", features = ["rustls"] }
@@ -30,11 +30,11 @@ ethers-signers = "2.0.0"
 jsonwebtoken = "8.3"
 sha2 = "0.10"
 hex = "0.4"
-rand = "0.8"
+rand = "0.9.0"
 
 # 存储相关
 ipfs-api-backend-hyper = "0.6" # IPFS交互
-reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12.14", features = ["json", "rustls-tls"] }
 
 # 缓存
 redis = { version = "0.23.0", features = ["tokio-comp"] }
@@ -60,3 +60,9 @@ rust-bert = "0.20.0"
 
 [dev-dependencies]
 tokio-test = "0.4"
+
+[source.crates-io]
+replace-with = 'ustc'
+
+[source.ustc]
+registry = "git://mirrors.ustc.edu.cn/crates.io-index"
