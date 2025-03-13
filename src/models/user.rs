@@ -1,9 +1,13 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use diesel::prelude::*;
+use diesel::Queryable;
+use diesel::Insertable;
 use uuid::Uuid;
+use crate::schema::users; // 假设你的表名是 users
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
+#[diesel(table_name = users)]
 pub struct User {
     pub id: Uuid,
     pub username: String,
