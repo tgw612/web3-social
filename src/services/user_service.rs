@@ -63,18 +63,23 @@ impl UserService {
     /// 查找或创建用户
     async fn find_or_create_user(&self, wallet_address: &str, chain_type: &str) -> Result<User, ServiceError> {
         use crate::schema::users::dsl::*;
-        let conn = self.db.lock().unwrap();
-        let user = users.filter(wallet_address.eq(wallet_address).and(chain_type.eq(chain_type)))
-            .first::<User>(&*conn)
+        let mut conn = self.db.lock().unwrap();
+        
+        let user = users
+            .filter(wallet_address.eq(wallet_address).and(chain_type.eq(chain_type)))
+            .first::<User>(&mut *conn)
             .optional()?;
 
         if let Some(user) = user {
             Ok(user)
         } else {
             diesel::insert_into(users)
-                .values((wallet_address.eq(wallet_address), chain_type.eq(chain_type)))
-                .get_result(&*conn)
-                .map_err(|_| ServiceError::InternalServerError)?
+                .values((
+                    wallet_address.eq(wallet_address),
+                    chain_type.eq(chain_type),
+                ))
+                .get_result(&mut *conn)
+                .map_err(|_| ServiceError::InternalServerError)
         }
     }
 
@@ -87,12 +92,13 @@ impl UserService {
         avatar_cid: Option<String>,
     ) -> Result<UserProfile, ServiceError> {
         use crate::schema::user_profiles::dsl::*;
-        let conn = self.db.lock().unwrap();
+        let mut conn = self.db.lock().unwrap();
 
         if let Some(username) = &username {
-            let exists = user_profiles.filter(username.eq(username).and(user_id.ne(user_id)))
+            let exists = user_profiles
+                .filter(username.eq(username).and(user_id.ne(user_id)))
                 .count()
-                .get_result::<i64>(&*conn)? > 0;
+                .get_result::<i64>(&mut *conn)? > 0;
 
             if exists {
                 return Err(ServiceError::BadRequest("用户名已存在".into()));
@@ -100,71 +106,73 @@ impl UserService {
         }
 
         diesel::insert_into(user_profiles)
-            .values((user_id.eq(user_id), username.eq(username), nickname.eq(nickname), avatar_cid.eq(avatar_cid)))
+            .values((
+                user_id.eq(user_id),
+                username.eq(username),
+                nickname.eq(nickname),
+                avatar_cid.eq(avatar_cid),
+            ))
             .on_conflict(user_id)
             .do_update()
-            .set((username.eq(username), nickname.eq(nickname), avatar_cid.eq(avatar_cid), updated_at.eq(diesel::dsl::now)))
-            .get_result(&*conn)
+            .set((
+                username.eq(username),
+                nickname.eq(nickname),
+                avatar_cid.eq(avatar_cid),
+                updated_at.eq(diesel::dsl::now),
+            ))
+            .get_result(&mut *conn)
             .map_err(|_| ServiceError::InternalServerError)
     }
 
     /// 获取用户资料
     pub async fn get_profile(&self, user_id: i32) -> Result<UserProfile, ServiceError> {
         use crate::schema::user_profiles::dsl::*;
-        let conn = self.db.lock().unwrap();
-        user_profiles.filter(user_id.eq(user_id))
-            .first::<UserProfile>(&*conn)
-            .optional()
-            .map_err(|_| ServiceError::NotFound("用户资料不存在".into()))
+        let mut conn = self.db.lock().unwrap();
+        
+        user_profiles
+            .filter(user_id.eq(user_id))
+            .first::<UserProfile>(&mut *conn)
+            .optional()?
+            .ok_or(ServiceError::NotFound("用户资料不存在".into()))
     }
 
     /// 通过用户名获取用户资料
     pub async fn get_profile_by_username(&self, username: &str) -> Result<UserProfile, ServiceError> {
-        let profile = sqlx::query_as!(
-            UserProfile,
-            r#"
-            SELECT * FROM user_profiles WHERE username = $1
-            "#,
-            username
-        )
-        .fetch_optional(&self.db)
-        .await?
-        .ok_or(ServiceError::NotFound("用户资料不存在".into()))?;
-
-        Ok(profile)
+        use crate::schema::user_profiles::dsl::*;
+        let mut conn = self.db.lock().unwrap();
+        
+        user_profiles
+            .filter(username.eq(username))
+            .first::<UserProfile>(&mut *conn)
+            .optional()?
+            .ok_or(ServiceError::NotFound("用户资料不存在".into()))
     }
 
     /// 通过钱包地址获取用户资料
     pub async fn get_profile_by_wallet(&self, wallet_address: &str) -> Result<UserProfile, ServiceError> {
-        let profile = sqlx::query_as!(
-            UserProfile,
-            r#"
-            SELECT p.* FROM user_profiles p
-            JOIN users u ON p.user_id = u.id
-            WHERE u.wallet_address = $1
-            "#,
-            wallet_address
-        )
-        .fetch_optional(&self.db)
-        .await?
-        .ok_or(ServiceError::NotFound("用户资料不存在".into()))?;
-
-        Ok(profile)
+        use crate::schema::users::dsl::{users, wallet_address as user_wallet};
+        use crate::schema::user_profiles::dsl::*;
+        let mut conn = self.db.lock().unwrap();
+        
+        user_profiles
+            .inner_join(users.on(user_id.eq(users.field("id"))))
+            .filter(user_wallet.eq(wallet_address))
+            .select(user_profiles::all_columns())
+            .first::<UserProfile>(&mut *conn)
+            .optional()?
+            .ok_or(ServiceError::NotFound("用户资料不存在".into()))
     }
 
     /// 通过用户ID获取钱包地址
     pub async fn get_wallet_address_by_user_id(&self, user_id: i32) -> Result<String, ServiceError> {
-        let user = sqlx::query!(
-            r#"
-            SELECT wallet_address FROM users 
-            WHERE id = $1
-            "#,
-            user_id
-        )
-        .fetch_optional(&self.db)
-        .await?
-        .ok_or(ServiceError::NotFound("用户不存在".into()))?;
-
-        Ok(user.wallet_address)
+        use crate::schema::users::dsl::{users, id, wallet_address};
+        let mut conn = self.db.lock().unwrap();
+        
+        wallet_address
+            .filter(id.eq(user_id))
+            .select(wallet_address)
+            .first::<String>(&mut *conn)
+            .optional()?
+            .ok_or(ServiceError::NotFound("用户不存在".into()))
     }
 } 

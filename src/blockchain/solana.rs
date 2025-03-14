@@ -54,7 +54,7 @@ pub async fn verify_transaction(tx_signature: &str) -> Result<TransactionVerific
     
     // 获取交易信息
     let tx_info = client.get_transaction(&signature, solana_client::rpc_config::RpcTransactionConfig {
-        encoding: None,
+        encoding: Some(solana_client::rpc_config::UiTransactionEncoding::Base64),
         commitment: None,
         max_supported_transaction_version: None,
     })
@@ -69,9 +69,9 @@ pub async fn verify_transaction(tx_signature: &str) -> Result<TransactionVerific
     
     // 获取交易发送方和接收方（简化，实际上需要解析交易指令）
     let tx = tx_info.transaction;
-    let from_address = tx.transaction.message.account_keys[0].to_string();
-    let to_address = if tx.transaction.message.account_keys.len() > 1 {
-        tx.transaction.message.account_keys[1].to_string()
+    let from_address = tx.account_keys[0].to_string();
+    let to_address = if tx.account_keys.len() > 1 {
+        tx.account_keys[1].to_string()
     } else {
         "".to_string()
     };

@@ -4,6 +4,7 @@ use ethers::types::{Address, BlockNumber, U256};
 use ethers::providers::{Http, Provider};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use serde_json;
 use std::env;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -120,7 +121,11 @@ pub async fn get_erc20_balance(token_address: &str, wallet_address: &str) -> Res
         .map_err(|e| format!("Invalid wallet address: {}", e))?;
     
     // 创建合约实例
-    let contract = Contract::new(token_address, ERC20_ABI.parse().unwrap(), client.clone());
+    let contract = Contract::new(
+        token_address,
+        serde_json::from_str::<ethers::abi::Abi>(ERC20_ABI).unwrap(),
+        client.clone(),
+    );
     
     // 调用balanceOf
     let balance: U256 = contract.method("balanceOf", wallet_address)
@@ -152,7 +157,11 @@ pub async fn get_token_info(token_address: &str) -> Result<(String, String), Str
         .map_err(|e| format!("Invalid token address: {}", e))?;
     
     // 创建合约实例
-    let contract = Contract::new(token_address, ERC20_ABI.parse().unwrap(), client.clone());
+    let contract = Contract::new(
+        token_address,
+        serde_json::from_str::<ethers::abi::Abi>(ERC20_ABI).unwrap(),
+        client.clone(),
+    );
     
     // 获取代币符号
     let symbol: String = contract.method("symbol", ())

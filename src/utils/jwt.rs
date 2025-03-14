@@ -3,32 +3,34 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
+use crate::utils::error::ServiceError;
+use serde::{Serialize, Deserialize};
+use chrono;
 
-pub fn generate_token(user_id: Uuid, wallet_address: &str, wallet_chain: &str) -> Result<String, jsonwebtoken::errors::Error> {
-    let expiration = env::var("JWT_EXPIRATION")
-        .unwrap_or_else(|_| "86400".to_string()) // 默认24小时
-        .parse::<usize>()
-        .unwrap_or(86400);
-    
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs() as usize;
-    
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Claims {
+    pub sub: i32,
+    pub wallet: String,
+    pub exp: i64,
+}
+
+pub fn generate_token(user_id: i32, wallet_address: &str) -> Result<String, ServiceError> {
+    let expiration = chrono::Utc::now()
+        .checked_add_signed(chrono::Duration::hours(24))
+        .expect("valid timestamp")
+        .timestamp();
+
     let claims = Claims {
-        sub: user_id.to_string(),
-        wallet_address: wallet_address.to_string(),
-        wallet_chain: wallet_chain.to_string(),
-        exp: now + expiration,
-        iat: now,
+        sub: user_id,
+        wallet: wallet_address.to_string(),
+        exp: expiration,
     };
+
+    let secret = env::var("JWT_SECRET").map_err(|_| ServiceError::InternalServerError)?;
+    let key = EncodingKey::from_secret(secret.as_bytes());
     
-    let secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
-    encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(secret.as_bytes())
-    )
+    encode(&Header::default(), &claims, &key)
+        .map_err(|_| ServiceError::InternalServerError)
 }
 
 pub fn validate_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {

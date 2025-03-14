@@ -5,6 +5,9 @@ use diesel::Queryable;
 use diesel::Insertable;
 use uuid::Uuid;
 use crate::schema::users; // 假设你的表名是 users
+use diesel::prelude::*;
+use diesel::Selectable;
+use chrono::NaiveDateTime;
 
 #[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
 #[diesel(table_name = users)]
@@ -79,4 +82,28 @@ impl User {
             assets,
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Queryable, Selectable)]
+#[diesel(table_name = crate::schema::user_profiles)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct UserProfile {
+    pub id: i32,
+    pub user_id: i32,
+    pub username: Option<String>,
+    pub nickname: Option<String>,
+    pub avatar_cid: Option<String>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+}
+
+#[derive(Debug, Serialize, Deserialize, Queryable, Selectable)]
+#[diesel(table_name = crate::schema::users)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct User {
+    pub id: i32,
+    pub wallet_address: String,
+    pub chain_type: String,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 } 

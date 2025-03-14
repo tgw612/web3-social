@@ -1,9 +1,6 @@
 // @generated automatically by Diesel CLI.
 
 // 添加 Diesel 导入
-use diesel::prelude::*;
-use diesel::sql_types::*;
-
 diesel::table! {
     users (id) {
         id -> Uuid,

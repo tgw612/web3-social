@@ -3,7 +3,7 @@ use actix_web::{middleware, web, App, HttpServer};
 use dotenv::dotenv;
 use log::info;
 use diesel::prelude::*;
-use diesel::pg::PgConnection;
+use diesel::r2d2::{self, ConnectionManager};
 use std::env;
 
 mod api;
@@ -13,6 +13,8 @@ mod models;
 mod services;
 mod utils;
 pub mod schema;
+
+type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -26,9 +28,11 @@ async fn main() -> std::io::Result<()> {
     let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
     let server_url = format!("{}:{}", host, port);
     
-    // 创建数据库连接
-    let connection = PgConnection::establish(&database_url)
-        .expect(&format!("Error connecting to {}", database_url));
+    // 创建数据库连接池
+    let manager = ConnectionManager::<PgConnection>::new(database_url);
+    let pool = r2d2::Pool::builder()
+        .build(manager)
+        .expect("Failed to create pool");
     
     info!("Starting server at: {}", server_url);
     
@@ -49,7 +53,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(middleware::Logger::default())
             .wrap(cors)
-            .app_data(web::Data::new(connection.clone()))
+            .app_data(web::Data::new(pool.clone()))
             .app_data(redis_pool.clone())
             // 注册API路由
             .configure(api::user::config)
