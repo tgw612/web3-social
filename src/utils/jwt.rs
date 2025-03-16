@@ -7,23 +7,19 @@ use crate::utils::error::ServiceError;
 use serde::{Serialize, Deserialize};
 use chrono;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Claims {
-    pub sub: i32,
-    pub wallet: String,
-    pub exp: i64,
-}
 
-pub fn generate_token(user_id: i32, wallet_address: &str) -> Result<String, ServiceError> {
+pub fn generate_token(user_id: Uuid, wallet_address: &str) -> Result<String, ServiceError> {
     let expiration = chrono::Utc::now()
         .checked_add_signed(chrono::Duration::hours(24))
         .expect("valid timestamp")
         .timestamp();
 
-    let claims = Claims {
-        sub: user_id,
-        wallet: wallet_address.to_string(),
-        exp: expiration,
+    let claims: Claims = Claims {
+        sub: user_id.to_string(),
+        wallet_address: wallet_address.to_string(),
+        exp: expiration as usize,
+        iat: chrono::Utc::now().timestamp() as usize,
+        wallet_chain: "ETH".to_string(),
     };
 
     let secret = env::var("JWT_SECRET").map_err(|_| ServiceError::InternalServerError)?;

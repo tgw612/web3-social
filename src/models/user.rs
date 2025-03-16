@@ -1,15 +1,13 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use diesel::prelude::*;
 use diesel::Queryable;
 use diesel::Insertable;
 use uuid::Uuid;
 use crate::schema::users; // 假设你的表名是 users
 use diesel::prelude::*;
 use diesel::Selectable;
-use chrono::NaiveDateTime;
 
-#[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
+#[derive(Debug, Serialize, Deserialize, Queryable, Insertable, Selectable)]
 #[diesel(table_name = users)]
 pub struct User {
     pub id: Uuid,
@@ -93,17 +91,6 @@ pub struct UserProfile {
     pub username: Option<String>,
     pub nickname: Option<String>,
     pub avatar_cid: Option<String>,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
-
-#[derive(Debug, Serialize, Deserialize, Queryable, Selectable)]
-#[diesel(table_name = crate::schema::users)]
-#[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct User {
-    pub id: i32,
-    pub wallet_address: String,
-    pub chain_type: String,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
-} 

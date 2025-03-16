@@ -15,6 +15,18 @@ diesel::table! {
 }
 
 diesel::table! {
+    user_profiles (id) {
+        id -> Int4,
+        user_id -> Int4,
+        username -> Nullable<Text>,
+        nickname -> Nullable<Text>,
+        avatar_cid -> Nullable<Text>,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     posts (id) {
         id -> Uuid,
         user_id -> Uuid,
@@ -75,6 +87,7 @@ diesel::joinable!(user_likes -> comments (comment_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     users,
+    user_profiles,
     posts,
     comments,
     user_likes,
