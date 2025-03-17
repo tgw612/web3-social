@@ -5,6 +5,13 @@ edition = "2021"
 authors = ["Web3 Social Team"]
 description = "基于web3的社交匿名财富交流平台后端服务"
 
+# 通过增量编译机制自动跳过未修改文件
+# 可减少约 30-50% 的编译时间
+[profile.dev]
+incremental = true  # 启用增量编译
+codegen-units = 1   # 减少并行编译单元
+
+
 [dependencies]
 # Web框架
 actix-web = "4.3.1"

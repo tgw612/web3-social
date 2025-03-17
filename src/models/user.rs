@@ -12,10 +12,10 @@ use diesel::Selectable;
 pub struct User {
     pub id: Uuid,
     pub username: String,
-    pub nickname: String,
+    pub nickname: Option<String>,
     pub wallet_address: String,
     pub wallet_chain: String, // ETH, SOL, etc.
-    pub avatar_ipfs_cid: String, // IPFS内容ID
+    pub avatar_ipfs_cid: Option<String>, // IPFS内容ID
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
