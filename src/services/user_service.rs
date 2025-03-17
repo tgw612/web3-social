@@ -1,12 +1,14 @@
-use crate::models::user::{User, UserProfile};
+use crate::{models::user::{User, UserProfile}, utils::error::ServiceError};
 use crate::utils::jwt;
-use crate::utils::error::ServiceError;
+use diesel::associations::HasTable;
 use diesel::pg::PgConnection;
 use std::sync::Arc;
 use std::sync::Mutex;
 // user_service.rs 或其他使用查询的模块
 use diesel::{BoolExpressionMethods, ExpressionMethods};  // 关键导入
 use diesel::QueryDsl;  
+use diesel::RunQueryDsl; // 关键trait
+use diesel::OptionalExtension; 
 
 /// 用户服务，处理用户身份和资料管理
 pub struct UserService {
@@ -30,10 +32,10 @@ impl UserService {
         self.verify_wallet_signature(&wallet_address, &signature, &message, &chain_type)?;
 
         // 检查用户是否存在，不存在则创建
-        let user = self.find_or_create_user(&wallet_address, &chain_type).await?;
+        let user: User = self.find_or_create_user(&wallet_address, &chain_type).await?;
 
         // 生成JWT令牌
-        let token = jwt::generate_token(user.id, &wallet_address)?;
+        let token: String = jwt::generate_token(user.id, &wallet_address)?;
 
         Ok(token)
     }
@@ -62,32 +64,34 @@ impl UserService {
     }
 
     /// 查找或创建用户
-    async fn find_or_create_user(&self, wallet_address: &str, wallet_chain: &str) -> Result<User, ServiceError> {
+    async fn find_or_create_user(&self, wallet_address: &String, wallet_chain: &str) -> Result<User, ServiceError> {
         use crate::schema::users::dsl::*;
              // 如果用到其他查询方法也需导入
         let mut conn = self.db.lock().unwrap();
         
-        let user = users
-            .filter(wallet_address.eq(wallet_address))
+        let user: Option<User> = users
+            .filter(wallet_address.eq(wallet_address))  
+            .filter(wallet_chain.eq(wallet_chain))
             .first::<User>(&mut *conn)
             .optional()?;
 
         if let Some(user) = user {
             Ok(user)
         } else {
-            diesel::insert_into(users)
-                .values(&User {
-                    wallet_address:wallet_address.to_string(),
-                    wallet_chain: wallet_chain.to_string(),
-                    id: uuid::Uuid::new_v4(),
-                    username: "".to_string(),
-                    nickname: "".to_string(),
-                    avatar_ipfs_cid: None,
-                    created_at: chrono::NaiveDateTime::now(),
-                    updated_at: chrono::NaiveDateTime::now(),
-                })
+            let new_user =User{
+                wallet_address: wallet_address,
+                wallet_chain: wallet_chain,
+                id: uuid::Uuid::new_v4(),
+                username: "".to_string(),
+                nickname: "".to_string(),
+                avatar_ipfs_cid: "".to_string(),
+                created_at: chrono::DateTime::to_utc(&self),
+                updated_at: chrono::NaiveDateTime::to_utc(),
+            };
+            diesel::insert_into(users::table())
+                .values(&new_user)
                 .get_result(&mut *conn)
-                .map_err(|_| ServiceError::InternalServerError)
+                .expect("Error saving new user")
         }
     }
 
