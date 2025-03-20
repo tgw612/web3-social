@@ -12,7 +12,7 @@ pub async fn get_assets(
     asset_service: web::Data<Arc<AssetService>>,
 ) -> impl Responder {
     // 获取用户钱包地址
-    let wallet_address = match user_service.get_wallet_address_by_user_id(auth_user.user_id).await {
+    let wallet_address: String = match user_service.get_wallet_address_by_user_id(auth_user.user_id).await {
         Ok(address) => address,
         Err(_) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({

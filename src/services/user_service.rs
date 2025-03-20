@@ -92,45 +92,37 @@ impl UserService {
             };
             diesel::insert_into(users::table())
                 .values(&new_user)
+                .get_result(&mut *conn)
+                .map_err(|_| ServiceError::InternalServerError)
         }
     }
 
     /// 更新用户资料
-    pub async fn update_prof            ile(
+    pub async fn update_profile(    
         &self,
         user_id: &String,
         username: Option<String>,
         nickname: Option<String>,
         avatar_cid: Option<String>,
-    ) -> Result<UserProfile, ServiceError> {
+    ) -> Result<String, ServiceError> {
         use crate::schema::user_profiles::dsl::{user_profiles, user_id as prof_user_id, username as prof_username};
         let mut conn = self.db.lock().unwrap();
-
         if let Some(username_val) = &username {
-            let exists = user_profiles
+            let exists: bool = user_profiles
                 .filter(prof_username.eq(username_val).and(prof_user_id.ne(prof_user_id)))
                 .count()
                 .get_result::<i64>(&mut *conn)? > 0;
 
             if exists {
                 return Err(ServiceError::BadRequest("用户名已存在".into()));
-            }else {
-                let new_user_profile: UserProfile = UserProfile{
-                    user_id: user_id.clone(),
-                    username: username_val.to_string(),
-                    nickname: nickname.clone(),
-                    avatar_cid: avatar_cid.clone(),
-                    created_at: Utc::now(),
-                    updated_at: Utc::now()  
-                };
-                diesel::insert_into(user_profiles)
-                    .values(&new_user_profile)
-                    .get_result(&mut *conn)
-                    .map_err(|_| ServiceError::InternalServerError)
+            } else {
+                return Ok(String::from("修改成功！"))
             }
+        } else {
+            // 处理没有提供用户名的情况
+            return Err(ServiceError::BadRequest("用户名不能为空".into()));
         }
-        
-    }
+    }   
 
     /// 获取用户资料
     pub async fn get_profile(&self, user_id: i32) -> Result<UserProfile, ServiceError> {
@@ -139,6 +131,7 @@ impl UserService {
         
         user_profiles
             .filter(user_id.eq(user_id))
+            .select((id, user_id, username, nickname, avatar_cid, created_at, updated_at))
             .first::<UserProfile>(&mut *conn)
             .optional()?
             .ok_or(ServiceError::NotFound("用户资料不存在".into()))
@@ -151,6 +144,7 @@ impl UserService {
         
         user_profiles
             .filter(username.eq(username))
+            .select((id, user_id, username, nickname, avatar_cid, created_at, updated_at))  
             .first::<UserProfile>(&mut *conn)
             .optional()?
             .ok_or(ServiceError::NotFound("用户资料不存在".into()))
@@ -158,29 +152,29 @@ impl UserService {
 
     /// 通过钱包地址获取用户资料
     pub async fn get_profile_by_wallet(&self, wallet_address: &str) -> Result<UserProfile, ServiceError> {
-        use crate::schema::users::dsl::{users, wallet_address as user_wallet};
         use crate::schema::user_profiles::dsl::*;
         let mut conn = self.db.lock().unwrap();
         
         user_profiles
-            .inner_join(users.on(prof_user_id.eq(user_id_col)))
-            .filter(user_wallet.eq(wallet_address))
-            .select(user_profiles::all_columns())
+            .filter(wallet_address.eq(wallet_address))
+            .select((id, user_id, username, nickname, avatar_cid, created_at, updated_at)) // 明确选择字段
             .first::<UserProfile>(&mut *conn)
             .optional()?
             .ok_or(ServiceError::NotFound("用户资料不存在".into()))
     }
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+                                                                                                                                                                  
     /// 通过用户ID获取钱包地址
-    pub async fn get_wallet_address_by_user_id(&self, user_id: &String) -> Result<String, ServiceError> {
+    pub async fn get_wallet_address_by_user_id(&self, user_id: &uuid::Uuid) -> Result<String, ServiceError> {
         use crate::schema::users::dsl::{users, id, wallet_address};
         let mut conn = self.db.lock().unwrap();
         
-        users
-            .filter(user_id.eq(id))
-            .select(user_wallet)
+        let user_wallet_address: String = users
+            .filter(id.eq(user_id))
+            .select(wallet_address)
             .first::<String>(&mut *conn)
             .optional()?
-            .ok_or(ServiceError::NotFound("用户不存在".into()))
+            .ok_or(ServiceError::NotFound("用户不存在".into()))?;
+
+        Ok(user_wallet_address)
     }
 } 

@@ -87,7 +87,8 @@ impl User {
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct UserProfile {
     pub id: i32,
-    pub user_id: i32,
+    pub user_id: Uuid,
+    pub wallet_address: String,
     pub username: Option<String>,
     pub nickname: Option<String>,
     pub avatar_cid: Option<String>,

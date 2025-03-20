@@ -17,9 +17,10 @@ diesel::table! {
 diesel::table! {
     user_profiles (id) {
         id -> Int4,
-        user_id -> Int4,
+        user_id -> Uuid,
         username -> Nullable<Text>,
         nickname -> Nullable<Text>,
+        wallet_address -> Text,
         avatar_cid -> Nullable<Text>,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
@@ -28,7 +29,7 @@ diesel::table! {
 
 diesel::table! {
     posts (id) {
-        id -> Uuid,
+        id -> Int4,
         user_id -> Uuid,
         content -> Text,
         images_ipfs_cids -> Nullable<Array<Text>>,
