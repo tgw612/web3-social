@@ -5,6 +5,11 @@ use log::info;
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
 use std::env;
+use std::sync::Arc;
+
+// 导入rbatis配置
+mod config;
+use config::rbatis_config;
 
 mod api;
 mod blockchain;
@@ -29,10 +34,13 @@ async fn main() -> std::io::Result<()> {
     let server_url = format!("{}:{}", host, port);
     
     // 创建数据库连接池
-    let manager = ConnectionManager::<PgConnection>::new(database_url);
+    let manager = ConnectionManager::<PgConnection>::new(database_url.clone());
     let pool = r2d2::Pool::builder()
         .build(manager)
         .expect("Failed to create pool");
+        
+    // 初始化Rbatis连接池
+    let rb = rbatis_config::init_rbatis(&database_url).await;
     
     info!("Starting server at: {}", server_url);
     
@@ -55,6 +63,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .app_data(web::Data::new(pool.clone()))
             .app_data(redis_pool.clone())
+            .app_data(web::Data::new(rb.clone()))
             // 注册API路由
             .configure(api::user::config)
             .configure(api::asset::config)
@@ -67,4 +76,4 @@ async fn main() -> std::io::Result<()> {
     .bind(server_url)?
     .run()
     .await
-} 
+}

@@ -24,6 +24,8 @@ serde_json = "1.0"
 
 # 数据库
 diesel = { version = "2.1.0", features = ["postgres", "r2d2", "chrono", "uuid"] }
+rbatis = { version = "4.3", features = ["postgres", "tokio-runtime"] }
+rbs = "4.3"
 
 # Web3相关
 ethers = { version = "2.0.13", features = ["rustls"] }

@@ -3,6 +3,7 @@ pub mod post;
 pub mod comment;
 pub mod asset;
 pub mod auth;
+pub mod rbatis_entities;
 
 // 公共响应结构
 use serde::{Deserialize, Serialize};
@@ -40,4 +41,4 @@ pub struct PaginatedResponse<T> {
     pub page: i64,
     pub per_page: i64,
     pub total_pages: i64,
-} 
+}

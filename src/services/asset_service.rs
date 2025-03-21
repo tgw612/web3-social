@@ -1,18 +1,17 @@
 use crate::blockchain::ethereum::EthClient;
 use crate::blockchain::solana::SolanaClient;
 use crate::models::asset::{Asset, AssetType, TokenBalance, NftAsset};
+use crate::models::rbatis_entities::{AssetEntity, NftAssetEntity};
 use crate::utils::error::ServiceError;
 use ethers::prelude::*;
-use diesel::prelude::*;
-use diesel::pg::PgConnection;
-use diesel::{BoolExpressionMethods, ExpressionMethods, QueryDsl, RunQueryDsl, OptionalExtension};
+use rbatis::crud::CRUD;
+use rbatis::rbatis::Rbatis;
 use std::sync::Arc;
-use std::sync::Mutex;
 use redis::Client as RedisClient;
 
 /// 资产服务，处理多链资产聚合和展示
 pub struct AssetService {
-    db: Arc<Mutex<PgConnection>>,
+    db: Arc<Rbatis>,
     redis: Arc<RedisClient>,
     eth_client: Arc<EthClient>,
     solana_client: Arc<SolanaClient>,
@@ -20,7 +19,7 @@ pub struct AssetService {
 
 impl AssetService {
     pub fn new(
-        db: Arc<Mutex<PgConnection>>,
+        db: Arc<Rbatis>,
         redis: Arc<RedisClient>,
         eth_client: Arc<EthClient>,
         solana_client: Arc<SolanaClient>,
@@ -51,15 +50,25 @@ impl AssetService {
 
     /// 从数据库获取已缓存的资产
     async fn get_cached_assets(&self, wallet_address: &str) -> Result<Vec<Asset>, ServiceError> {
-        use crate::schema::assets::dsl::*;
-        let conn = self.db.lock().unwrap();
-        let result = assets
-            .filter(wallet_address.eq(wallet_address))
-            .order(value_usd.desc())
-            .load::<Asset>(&*conn)
+        let entities = self.db.fetch_list_by_column::<AssetEntity, _>("wallet_address", wallet_address).await
             .map_err(|_| ServiceError::InternalServerError)?;
+            
+        // 将AssetEntity转换为Asset
+        let assets = entities.into_iter().map(|e| Asset {
+            chain_id: e.chain_id,
+            asset_type: e.asset_type,
+            symbol: e.symbol,
+            name: e.name,
+            contract_address: e.contract_address,
+            balance: e.balance,
+            decimals: e.decimals.map(|d| d as u8).unwrap_or(0),
+            price_usd: e.price_usd,
+            value_usd: e.value_usd,
+            created_at: e.created_at.map(|dt| dt.into()),
+            updated_at: e.updated_at.map(|dt| dt.into()),
+        }).collect();
 
-        Ok(result)
+        Ok(assets)
     }
 
     /// 更新用户资产数据
@@ -152,31 +161,38 @@ impl AssetService {
 
     /// 保存资产到数据库
     async fn save_asset(&self, wallet_address: &str, asset: &Asset) -> Result<(), ServiceError> {
-        use crate::schema::assets::dsl::*;
-        let conn = self.db.lock().unwrap();
-        diesel::insert_into(assets)
-            .values((
-                wallet_address.eq(wallet_address),
-                chain_id.eq(&asset.chain_id),
-                asset_type.eq(&asset.asset_type),
-                symbol.eq(&asset.symbol),
-                name.eq(&asset.name),
-                contract_address.eq(&asset.contract_address),
-                balance.eq(asset.balance),
-                decimals.eq(asset.decimals),
-                price_usd.eq(asset.price_usd),
-                value_usd.eq(asset.value_usd)
-            ))
-            .on_conflict((wallet_address, chain_id, contract_address))
-            .do_update()
-            .set((
-                balance.eq(asset.balance),
-                price_usd.eq(asset.price_usd),
-                value_usd.eq(asset.value_usd),
-                updated_at.eq(diesel::dsl::now)
-            ))
-            .execute(&*conn)
+        // 检查资产是否已存在
+        let existing = self.db.fetch_by_column::<Option<AssetEntity>, _>("wallet_address", wallet_address)
+            .await
             .map_err(|_| ServiceError::InternalServerError)?;
+            
+        // 创建AssetEntity
+        let entity = AssetEntity {
+            wallet_address: wallet_address.to_string(),
+            chain_id: asset.chain_id,
+            asset_type: asset.asset_type.clone(),
+            symbol: asset.symbol.clone(),
+            name: asset.name.clone(),
+            contract_address: asset.contract_address.clone(),
+            balance: asset.balance,
+            decimals: asset.decimals.map(|d| d as i32),
+            price_usd: asset.price_usd,
+            value_usd: asset.value_usd,
+            created_at: None, // 数据库会自动设置
+            updated_at: None, // 数据库会自动设置
+        };
+        
+        if existing.is_some() {
+            // 更新现有记录
+            self.db.update_by_column::<AssetEntity>("wallet_address", &entity)
+                .await
+                .map_err(|_| ServiceError::InternalServerError)?;
+        } else {
+            // 插入新记录
+            self.db.save(&entity, &[])
+                .await
+                .map_err(|_| ServiceError::InternalServerError)?;
+        }
 
         Ok(())
     }
@@ -195,12 +211,21 @@ impl AssetService {
 
     /// 获取用户NFT资产
     pub async fn get_user_nfts(&self, wallet_address: &str) -> Result<Vec<NftAsset>, ServiceError> {
-        use crate::schema::nft_assets::dsl::*;
-        let conn = self.db.lock().unwrap();
-        let nfts = nft_assets
-            .filter(wallet_address.eq(wallet_address))
-            .load::<NftAsset>(&*conn)
+        let entities = self.db.fetch_list_by_column::<NftAssetEntity, _>("wallet_address", wallet_address)
+            .await
             .map_err(|_| ServiceError::InternalServerError)?;
+            
+        // 将NftAssetEntity转换为NftAsset
+        let nfts: Vec<NftAsset> = entities.into_iter().map(|e| NftAsset {
+            chain_id: e.chain_id,
+            contract_address: e.contract_address,
+            token_id: e.token_id,
+            name: e.name,
+            image_url: e.image_url,
+            metadata_url: e.metadata_url,
+            created_at: e.created_at.map(|dt| dt.into()),
+            updated_at: e.updated_at.map(|dt| dt.into()),
+        }).collect();
 
         if nfts.is_empty() {
             // 获取以太坊NFT
@@ -227,42 +252,49 @@ impl AssetService {
 
     /// 保存NFT到数据库
     async fn save_nft(&self, wallet_address: &str, nft: &NftAsset) -> Result<(), ServiceError> {
-        use crate::schema::nft_assets::dsl::*;
-        let conn = self.db.lock().unwrap();
-        diesel::insert_into(nft_assets)
-            .values((
-                wallet_address.eq(wallet_address),
-                chain_id.eq(&nft.chain_id),
-                contract_address.eq(&nft.contract_address),
-                token_id.eq(&nft.token_id),
-                name.eq(&nft.name),
-                image_url.eq(&nft.image_url),
-                metadata_url.eq(&nft.metadata_url)
-            ))
-            .on_conflict((wallet_address, chain_id, contract_address, token_id))
-            .do_update()
-            .set((
-                name.eq(&nft.name),
-                image_url.eq(&nft.image_url),
-                metadata_url.eq(&nft.metadata_url),
-                updated_at.eq(diesel::dsl::now)
-            ))
-            .execute(&*conn)
+        // 检查NFT是否已存在
+        let existing = self.db.fetch_by_column::<Option<NftAssetEntity>, _>("wallet_address", wallet_address)
+            .await
             .map_err(|_| ServiceError::InternalServerError)?;
+            
+        // 创建NftAssetEntity
+        let entity = NftAssetEntity {
+            wallet_address: wallet_address.to_string(),
+            chain_id: nft.chain_id,
+            contract_address: nft.contract_address.clone(),
+            token_id: nft.token_id.clone(),
+            name: nft.name.clone(),
+            image_url: nft.image_url.clone(),
+            metadata_url: nft.metadata_url.clone(),
+            created_at: None, // 数据库会自动设置
+            updated_at: None, // 数据库会自动设置
+        };
+        
+        if existing.is_some() {
+            // 更新现有记录
+            self.db.update_by_column::<NftAssetEntity>("wallet_address", &entity)
+                .await
+                .map_err(|_| ServiceError::InternalServerError)?;
+        } else {
+            // 插入新记录
+            self.db.save(&entity, &[])
+                .await
+                .map_err(|_| ServiceError::InternalServerError)?;
+        }
 
         Ok(())
     }
 
     /// 获取用户资产总价值（美元）
     pub async fn get_total_value(&self, wallet_address: &str) -> Result<f64, ServiceError> {
-        use crate::schema::assets::dsl::*;
-        let conn = self.db.lock().unwrap();
-        let total: f64 = assets
-            .filter(wallet_address.eq(wallet_address))
-            .select(diesel::dsl::sum(value_usd))
-            .first(&*conn)
-            .unwrap_or(0.0);
-
-        Ok(total)
+        // 使用rbatis执行原生SQL查询获取总价值
+        let sql = r#"SELECT SUM(value_usd) as total FROM assets WHERE wallet_address = ?"
+            .to_string();
+        
+        let total: Option<f64> = self.db.query_decode(&sql, vec![rbs::to_value!(wallet_address)])
+            .await
+            .map_err(|_| ServiceError::InternalServerError)?;
+            
+        Ok(total.unwrap_or(0.0))
     }
 }
