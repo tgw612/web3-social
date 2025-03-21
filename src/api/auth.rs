@@ -35,6 +35,7 @@ pub async fn wallet_login(
             HttpResponse::Ok().json(LoginResponse {
                 token,
                 user_id: None, // 实际应用中可能需要从JWT中解析user_id
+                // todo 登录成功存储用户信息
             })
         },
         Err(err) => {

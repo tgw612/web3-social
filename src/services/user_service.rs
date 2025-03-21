@@ -164,12 +164,12 @@ impl UserService {
     }
                                                                                                                                                                   
     /// 通过用户ID获取钱包地址
-    pub async fn get_wallet_address_by_user_id(&self, user_id_val: &String) -> Result<String, ServiceError> {
-        use crate::schema::users::dsl::{users, id, wallet_address};
+    pub async fn get_wallet_address_by_user_id(&self, user_id_val: String) -> Result<String, ServiceError> {
+        use crate::schema::users::dsl::*;
         let mut conn = self.db.lock().unwrap();
         
-        let user_wallet_address: String = users
-            .filter(id.eq(user_id_val))
+        let user_wallet_address: String = 
+        users.filter(id.eq(user_id_val))
             .select(wallet_address)
             .first::<String>(&mut *conn)
             .optional()?

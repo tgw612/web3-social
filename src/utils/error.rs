@@ -3,6 +3,7 @@ use std::fmt;
 #[derive(Debug)]
 pub enum ServiceError {
     AuthenticationError(String),
+    BadRequest(String),
     NotFound(String),
     DatabaseError(String),
     InternalServerError,
@@ -13,6 +14,7 @@ impl fmt::Display for ServiceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ServiceError::AuthenticationError(msg) => write!(f, "Authentication Error: {}", msg),
+            ServiceError::BadRequest(msg) => write!(f, "BadRequest : {}", msg),
             ServiceError::NotFound(msg) => write!(f, "Not Found: {}", msg),
             ServiceError::DatabaseError(msg) => write!(f, "Not Found: {}", msg),
             ServiceError::InternalServerError => write!(f, "Internal Server Error"),
