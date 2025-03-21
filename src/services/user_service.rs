@@ -100,7 +100,7 @@ impl UserService {
     /// 更新用户资料
     pub async fn update_profile(    
         &self,
-        user_id: &String,
+        user_id: String,
         username: Option<String>,
         nickname: Option<String>,
         avatar_cid: Option<String>,
@@ -125,7 +125,7 @@ impl UserService {
     }   
 
     /// 获取用户资料
-    pub async fn get_profile(&self, user_id: i32) -> Result<UserProfile, ServiceError> {
+    pub async fn get_profile(&self, user_id: String) -> Result<UserProfile, ServiceError> {
         use crate::schema::user_profiles::dsl::*;
         let mut conn = self.db.lock().unwrap();
         
@@ -164,12 +164,12 @@ impl UserService {
     }
                                                                                                                                                                   
     /// 通过用户ID获取钱包地址
-    pub async fn get_wallet_address_by_user_id(&self, user_id: &uuid::Uuid) -> Result<String, ServiceError> {
+    pub async fn get_wallet_address_by_user_id(&self, user_id_val: &String) -> Result<String, ServiceError> {
         use crate::schema::users::dsl::{users, id, wallet_address};
         let mut conn = self.db.lock().unwrap();
         
         let user_wallet_address: String = users
-            .filter(id.eq(user_id))
+            .filter(id.eq(user_id_val))
             .select(wallet_address)
             .first::<String>(&mut *conn)
             .optional()?

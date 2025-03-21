@@ -40,7 +40,7 @@ pub async fn wallet_login(
         Err(err) => {
             // 登录失败，返回错误信息
             match err {
-                ServiceError::InvalidCredentials(_) => {
+                ServiceError::AuthenticationError(_) => {
                     HttpResponse::Unauthorized().json(serde_json::json!({
                         "status": "error",
                         "message": "签名验证失败"

@@ -21,7 +21,7 @@ impl Auth {
 // 用于存储在请求扩展中的用户信息
 #[derive(Debug, Clone)]
 pub struct AuthenticatedUser {
-    pub user_id: Uuid,
+    pub user_id: String,
     pub wallet_address: String,
     pub wallet_chain: String,
 }
@@ -79,10 +79,10 @@ where
         }
 
         // 验证JWT令牌
-        let user_info = match jwt::validate_token(&token) {
+        let user_info: AuthenticatedUser = match jwt::validate_token(&token) {
             Ok(claims) => {
-                let user_id = match Uuid::parse_str(&claims.sub) {
-                    Ok(id) => id,
+                let user_id: String = match Uuid::parse_str(&claims.sub) {
+                    Ok(i) => user_id.to_string(),
                     Err(_) => {
                         return Box::pin(async move {
                             Err(ErrorForbidden("Invalid user ID"))

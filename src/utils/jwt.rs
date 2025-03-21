@@ -22,7 +22,7 @@ pub fn generate_token(user_id: Uuid, wallet_address: &str) -> Result<String, Ser
         wallet_chain: "ETH".to_string(),
     };
 
-    let secret = env::var("JWT_SECRET").map_err(|_| ServiceError::InternalServerError)?;
+    let secret: String = env::var("JWT_SECRET").map_err(|_| ServiceError::InternalServerError)?;
     let key = EncodingKey::from_secret(secret.as_bytes());
     
     encode(&Header::default(), &claims, &key)
@@ -30,8 +30,8 @@ pub fn generate_token(user_id: Uuid, wallet_address: &str) -> Result<String, Ser
 }
 
 pub fn validate_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
-    let secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
-    let validation = Validation::default();
+    let secret: String = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+    let validation: Validation = Validation::default();
     
     let token_data = decode::<Claims>(
         token,

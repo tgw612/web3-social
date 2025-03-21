@@ -4,7 +4,6 @@ use diesel::Queryable;
 use diesel::Insertable;
 use uuid::Uuid;
 use crate::schema::users; // 假设你的表名是 users
-use diesel::prelude::*;
 use diesel::Selectable;
 
 #[derive(Debug, Serialize, Deserialize, Queryable, Insertable, Selectable)]

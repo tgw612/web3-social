@@ -5,6 +5,7 @@ use crate::utils::error::ServiceError;
 use ethers::prelude::*;
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
+use diesel::{BoolExpressionMethods, ExpressionMethods, QueryDsl, RunQueryDsl, OptionalExtension};
 use std::sync::Arc;
 use std::sync::Mutex;
 use redis::Client as RedisClient;
@@ -52,11 +53,13 @@ impl AssetService {
     async fn get_cached_assets(&self, wallet_address: &str) -> Result<Vec<Asset>, ServiceError> {
         use crate::schema::assets::dsl::*;
         let conn = self.db.lock().unwrap();
-        let assets = assets.filter(wallet_address.eq(wallet_address))
+        let result = assets
+            .filter(wallet_address.eq(wallet_address))
             .order(value_usd.desc())
-            .load::<Asset>(&*conn)?;
+            .load::<Asset>(&*conn)
+            .map_err(|_| ServiceError::InternalServerError)?;
 
-        Ok(assets)
+        Ok(result)
     }
 
     /// 更新用户资产数据
@@ -115,36 +118,32 @@ impl AssetService {
 
     /// 从外部API获取代币价格
     async fn fetch_token_prices(&self, token_addresses: &[String]) -> Result<std::collections::HashMap<String, f64>, ServiceError> {
-        // 实际实现会调用CoinGecko等API
-        // 这里简化处理，返回模拟数据
         let mut prices = std::collections::HashMap::new();
         
-        // 模拟价格数据
         for addr in token_addresses {
-            // 检查redis缓存
             let cache_key = format!("token_price:{}", addr);
-            let mut con = self.redis.get_async_connection().await?;
+            let mut con = self.redis.get_async_connection().await
+                .map_err(|_| ServiceError::InternalServerError)?;
             
             let cached_price: Option<f64> = redis::cmd("GET")
                 .arg(&cache_key)
                 .query_async(&mut con)
                 .await
-                .ok();
+                .map_err(|_| ServiceError::InternalServerError)?;
                 
             if let Some(price) = cached_price {
                 prices.insert(addr.clone(), price);
             } else {
-                // 模拟价格（实际环境中从API获取）
-                let price = 1.0; // 假设价格
+                let price = 1.0; // 模拟价格
                 prices.insert(addr.clone(), price);
                 
-                // 缓存价格（5分钟过期）
                 redis::cmd("SETEX")
                     .arg(&cache_key)
-                    .arg(300) // 5分钟过期
+                    .arg(300)
                     .arg(price)
                     .query_async(&mut con)
-                    .await?;
+                    .await
+                    .map_err(|_| ServiceError::InternalServerError)?;
             }
         }
         
@@ -156,12 +155,30 @@ impl AssetService {
         use crate::schema::assets::dsl::*;
         let conn = self.db.lock().unwrap();
         diesel::insert_into(assets)
-            .values((wallet_address.eq(wallet_address), chain_id.eq(asset.chain_id), asset_type.eq(asset.asset_type), symbol.eq(asset.symbol), name.eq(asset.name), contract_address.eq(asset.contract_address), balance.eq(asset.balance), decimals.eq(asset.decimals), price_usd.eq(asset.price_usd), value_usd.eq(asset.value_usd)))
+            .values((
+                wallet_address.eq(wallet_address),
+                chain_id.eq(&asset.chain_id),
+                asset_type.eq(&asset.asset_type),
+                symbol.eq(&asset.symbol),
+                name.eq(&asset.name),
+                contract_address.eq(&asset.contract_address),
+                balance.eq(asset.balance),
+                decimals.eq(asset.decimals),
+                price_usd.eq(asset.price_usd),
+                value_usd.eq(asset.value_usd)
+            ))
             .on_conflict((wallet_address, chain_id, contract_address))
             .do_update()
-            .set((balance.eq(asset.balance), price_usd.eq(asset.price_usd), value_usd.eq(asset.value_usd), updated_at.eq(diesel::dsl::now)))
+            .set((
+                balance.eq(asset.balance),
+                price_usd.eq(asset.price_usd),
+                value_usd.eq(asset.value_usd),
+                updated_at.eq(diesel::dsl::now)
+            ))
             .execute(&*conn)
-            .map_err(|_| ServiceError::InternalServerError)
+            .map_err(|_| ServiceError::InternalServerError)?;
+
+        Ok(())
     }
 
     /// 获取特定代币余额
@@ -180,8 +197,10 @@ impl AssetService {
     pub async fn get_user_nfts(&self, wallet_address: &str) -> Result<Vec<NftAsset>, ServiceError> {
         use crate::schema::nft_assets::dsl::*;
         let conn = self.db.lock().unwrap();
-        let nfts = nft_assets.filter(wallet_address.eq(wallet_address))
-            .load::<NftAsset>(&*conn)?;
+        let nfts = nft_assets
+            .filter(wallet_address.eq(wallet_address))
+            .load::<NftAsset>(&*conn)
+            .map_err(|_| ServiceError::InternalServerError)?;
 
         if nfts.is_empty() {
             // 获取以太坊NFT
@@ -211,23 +230,39 @@ impl AssetService {
         use crate::schema::nft_assets::dsl::*;
         let conn = self.db.lock().unwrap();
         diesel::insert_into(nft_assets)
-            .values((wallet_address.eq(wallet_address), chain_id.eq(nft.chain_id), contract_address.eq(nft.contract_address), token_id.eq(nft.token_id), name.eq(nft.name), image_url.eq(nft.image_url), metadata_url.eq(nft.metadata_url)))
+            .values((
+                wallet_address.eq(wallet_address),
+                chain_id.eq(&nft.chain_id),
+                contract_address.eq(&nft.contract_address),
+                token_id.eq(&nft.token_id),
+                name.eq(&nft.name),
+                image_url.eq(&nft.image_url),
+                metadata_url.eq(&nft.metadata_url)
+            ))
             .on_conflict((wallet_address, chain_id, contract_address, token_id))
             .do_update()
-            .set((name.eq(nft.name), image_url.eq(nft.image_url), metadata_url.eq(nft.metadata_url), updated_at.eq(diesel::dsl::now)))
+            .set((
+                name.eq(&nft.name),
+                image_url.eq(&nft.image_url),
+                metadata_url.eq(&nft.metadata_url),
+                updated_at.eq(diesel::dsl::now)
+            ))
             .execute(&*conn)
-            .map_err(|_| ServiceError::InternalServerError)
+            .map_err(|_| ServiceError::InternalServerError)?;
+
+        Ok(())
     }
 
     /// 获取用户资产总价值（美元）
     pub async fn get_total_value(&self, wallet_address: &str) -> Result<f64, ServiceError> {
         use crate::schema::assets::dsl::*;
         let conn = self.db.lock().unwrap();
-        let total: f64 = assets.filter(wallet_address.eq(wallet_address))
+        let total: f64 = assets
+            .filter(wallet_address.eq(wallet_address))
             .select(diesel::dsl::sum(value_usd))
             .first(&*conn)
             .unwrap_or(0.0);
 
         Ok(total)
     }
-} 
+}

@@ -2,8 +2,9 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum ServiceError {
-    BadRequest(String),
+    AuthenticationError(String),
     NotFound(String),
+    DatabaseError(String),
     InternalServerError,
     Unauthorized(String),
 }
@@ -11,8 +12,9 @@ pub enum ServiceError {
 impl fmt::Display for ServiceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ServiceError::BadRequest(msg) => write!(f, "Bad Request: {}", msg),
+            ServiceError::AuthenticationError(msg) => write!(f, "Authentication Error: {}", msg),
             ServiceError::NotFound(msg) => write!(f, "Not Found: {}", msg),
+            ServiceError::DatabaseError(msg) => write!(f, "Not Found: {}", msg),
             ServiceError::InternalServerError => write!(f, "Internal Server Error"),
             ServiceError::Unauthorized(msg) => write!(f, "Unauthorized: {}", msg),
         }
@@ -28,4 +30,4 @@ impl From<diesel::result::Error> for ServiceError {
             _ => ServiceError::InternalServerError,
         }
     }
-} 
+}
