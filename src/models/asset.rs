@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize)]
+use rbatis::rbdc::datetime::DateTime;
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Asset {
     pub chain_id: i32,
     pub asset_type: String,

@@ -45,7 +45,6 @@ pub async fn create_comment(
         &wallet_address,
         post_id,
         &data.content,
-        data.parent_id,
     ).await {
         Ok(comment) => HttpResponse::Created().json(comment),
         Err(err) => {

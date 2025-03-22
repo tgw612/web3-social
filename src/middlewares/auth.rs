@@ -26,6 +26,21 @@ pub struct AuthenticatedUser {
     pub wallet_chain: String,
 }
 
+// 新增 FromRequest 实现
+impl actix_web::FromRequest for AuthenticatedUser {
+    type Error = actix_web::Error;
+    type Future = futures::future::Ready<Result<Self, Self::Error>>;
+
+    fn from_request(req: &actix_web::HttpRequest, _: &mut actix_web::dev::Payload) -> Self::Future {
+        let value = req.extensions().get::<AuthenticatedUser>().cloned();
+        let result = match value {
+            Some(user) => Ok(user),
+            None => Err(ErrorUnauthorized("Unauthorized")),
+        };
+        futures::future::ready(result)
+    }
+}
+
 // 实现Transform特性
 impl<S, B> Transform<S, ServiceRequest> for Auth
 where
@@ -113,4 +128,4 @@ where
             Ok(res)
         })
     }
-} 
+}

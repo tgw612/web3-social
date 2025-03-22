@@ -1,7 +1,7 @@
-use crate::services::user_service::UserService;
-use crate::services::asset_service::AssetService;
-use crate::utils::error::ServiceError;
 use crate::middlewares::auth::AuthenticatedUser;
+use crate::services::asset_service::AssetService;
+use crate::services::user_service::UserService;
+use crate::utils::error::ServiceError;
 use actix_web::{web, HttpResponse, Responder};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -20,22 +20,16 @@ pub async fn get_current_profile(
 ) -> impl Responder {
     match user_service.get_profile(auth_user.user_id).await {
         Ok(profile) => HttpResponse::Ok().json(profile),
-        Err(err) => {
-            match err {
-                ServiceError::NotFound(_) => {
-                    HttpResponse::NotFound().json(serde_json::json!({
-                        "status": "error",
-                        "message": "用户资料不存在"
-                    }))
-                },
-                _ => {
-                    HttpResponse::InternalServerError().json(serde_json::json!({
-                        "status": "error",
-                        "message": format!("获取用户资料失败: {}", err)
-                    }))
-                }
-            }
-        }
+        Err(err) => match err {
+            ServiceError::NotFound(_) => HttpResponse::NotFound().json(serde_json::json!({
+                "status": "error",
+                "message": "用户资料不存在"
+            })),
+            _ => HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": format!("获取用户资料失败: {}", err)
+            })),
+        },
     }
 }
 
@@ -46,29 +40,26 @@ pub async fn update_profile(
     user_service: web::Data<Arc<UserService>>,
 ) -> impl Responder {
     // 调用用户服务更新资料
-    match user_service.update_profile(
-        auth_user.user_id,
-        data.username.clone(),
-        data.nickname.clone(),
-        None, // 头像CID暂时为空，实际应用中需要先上传到IPFS
-    ).await {
+    match user_service
+        .update_profile(
+            auth_user.user_id,
+            data.username.clone(),
+            data.nickname.clone(),
+            None, // 头像CID暂时为空，实际应用中需要先上传到IPFS
+        )
+        .await
+    {
         Ok(profile) => HttpResponse::Ok().json(profile),
-        Err(err) => {
-            match err {
-                ServiceError::BadRequest(msg) => {
-                    HttpResponse::BadRequest().json(serde_json::json!({
-                        "status": "error",
-                        "message": msg
-                    }))
-                },
-                _ => {
-                    HttpResponse::InternalServerError().json(serde_json::json!({
-                        "status": "error",
-                        "message": format!("更新用户资料失败: {}", err)
-                    }))
-                }
-            }
-        }
+        Err(err) => match err {
+            ServiceError::BadRequest(msg) => HttpResponse::BadRequest().json(serde_json::json!({
+                "status": "error",
+                "message": msg
+            })),
+            _ => HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": format!("更新用户资料失败: {}", err)
+            })),
+        },
     }
 }
 
@@ -79,24 +70,20 @@ pub async fn get_profile_by_wallet(
     asset_service: web::Data<Arc<AssetService>>,
 ) -> impl Responder {
     let wallet_address = path.into_inner();
-    
+
     // 获取用户资料
     let profile = match user_service.get_profile_by_wallet(&wallet_address).await {
         Ok(profile) => profile,
         Err(err) => {
             return match err {
-                ServiceError::NotFound(_) => {
-                    HttpResponse::NotFound().json(serde_json::json!({
-                        "status": "error",
-                        "message": "用户不存在"
-                    }))
-                },
-                _ => {
-                    HttpResponse::InternalServerError().json(serde_json::json!({
-                        "status": "error",
-                        "message": format!("获取用户资料失败: {}", err)
-                    }))
-                }
+                ServiceError::NotFound(_) => HttpResponse::NotFound().json(serde_json::json!({
+                    "status": "error",
+                    "message": "用户不存在"
+                })),
+                _ => HttpResponse::InternalServerError().json(serde_json::json!({
+                    "status": "error",
+                    "message": format!("获取用户资料失败: {}", err)
+                })),
             }
         }
     };
@@ -121,6 +108,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         web::scope("/users")
             .route("/me", web::get().to(get_current_profile))
             .route("/update_profile", web::post().to(update_profile))
-            .route("/wallet/{address}", web::get().to(get_profile_by_wallet))
+            .route("/wallet/{address}", web::get().to(get_profile_by_wallet)),
     );
-} 
+}
