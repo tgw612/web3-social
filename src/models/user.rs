@@ -1,13 +1,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use diesel::Queryable;
-use diesel::Insertable;
 use uuid::Uuid;
-use crate::schema::users; // 假设你的表名是 users
-use diesel::Selectable;
 
-#[derive(Debug, Serialize, Deserialize, Queryable, Insertable, Selectable)]
-#[diesel(table_name = users)]
+#[derive(Debug, Serialize, Deserialize)]
+#[crud_table(table_name:"users")]
 pub struct User {
     pub id: Uuid,
     pub username: String,
@@ -81,9 +77,8 @@ impl User {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Queryable, Selectable)]
-#[diesel(table_name = crate::schema::user_profiles)]
-#[diesel(check_for_backend(diesel::pg::Pg))]
+#[derive(Debug, Serialize, Deserialize)]
+#[crud_table(table_name:"user_profiles")]
 pub struct UserProfile {
     pub id: i32,
     pub user_id: Uuid,

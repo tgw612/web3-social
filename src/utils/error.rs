@@ -4,6 +4,7 @@ use std::fmt;
 pub enum ServiceError {
     AuthenticationError(String),
     BadRequest(String),
+    ExternalService(String),
     NotFound(String),
     DatabaseError(String),
     InternalServerError,
@@ -15,6 +16,7 @@ impl fmt::Display for ServiceError {
         match self {
             ServiceError::AuthenticationError(msg) => write!(f, "Authentication Error: {}", msg),
             ServiceError::BadRequest(msg) => write!(f, "BadRequest : {}", msg),
+            ServiceError::ExternalService(msg) => write!(f, "ExternalService : {}", msg),
             ServiceError::NotFound(msg) => write!(f, "Not Found: {}", msg),
             ServiceError::DatabaseError(msg) => write!(f, "Not Found: {}", msg),
             ServiceError::InternalServerError => write!(f, "Internal Server Error"),
@@ -24,12 +26,3 @@ impl fmt::Display for ServiceError {
 }
 
 impl std::error::Error for ServiceError {}
-
-impl From<diesel::result::Error> for ServiceError {
-    fn from(error: diesel::result::Error) -> Self {
-        match error {
-            diesel::result::Error::NotFound => ServiceError::NotFound("记录未找到".into()),
-            _ => ServiceError::InternalServerError,
-        }
-    }
-}

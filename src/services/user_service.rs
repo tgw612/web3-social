@@ -1,23 +1,15 @@
 use crate::{models::user::{User, UserProfile}, utils::error::ServiceError};
 use crate::utils::jwt;
-use diesel::associations::HasTable;
-use diesel::pg::PgConnection;
+use crate::models::rbatis_entities::{UserEntity, UserProfileEntity};
 use std::sync::Arc;
-use std::sync::Mutex;
-// user_service.rs 或其他使用查询的模块
-use diesel::{BoolExpressionMethods, ExpressionMethods};  // 关键导入
-use diesel::QueryDsl;  
-use diesel::RunQueryDsl; // 关键trait
-use diesel::OptionalExtension; 
-
 
 /// 用户服务，处理用户身份和资料管理
 pub struct UserService {
-    db: Arc<Mutex<PgConnection>>,
+    db: Arc<Rbatis>,
 }
 
 impl UserService {
-    pub fn new(db: Arc<Mutex<PgConnection>>) -> Self {
+    pub fn new(db: Arc<Rbatis>) -> Self {
         Self { db }
     }
 
@@ -66,34 +58,56 @@ impl UserService {
 
     /// 查找或创建用户
     async fn find_or_create_user(&self, wallet_address_val: &String, wallet_chain_val: &str) -> Result<User, ServiceError> {
-        use crate::schema::users::dsl::*;
-             // 如果用到其他查询方法也需导入
-        let mut conn = self.db.lock().unwrap();
+        // 使用rbatis查询用户
+        let user_entity = self.db.fetch_by_column::<UserEntity, _>("wallet_address", wallet_address_val)
+            .await
+            .map_err(|e| ServiceError::InternalServerError)?;
         
-        let user: Option<User> = users
-            .filter(wallet_address.eq(wallet_address))  
-            .filter(wallet_chain.eq(wallet_chain))
-            .first::<User>(&mut *conn)
-            .optional()?;
-
-        if let Some(user) = user {
+        if let Some(entity) = user_entity {
+            // 将实体转换为User模型
+            let user = User {
+                id: entity.id,
+                username: entity.username,
+                nickname: entity.nickname,
+                wallet_address: entity.wallet_address,
+                wallet_chain: entity.wallet_chain,
+                avatar_ipfs_cid: entity.avatar_ipfs_cid,
+                created_at: entity.created_at.into(),
+                updated_at: entity.updated_at.into(),
+            };
             Ok(user)
         } else {
             use chrono::{DateTime, Utc};
-            let new_user: User =User{
-                wallet_address: wallet_address_val.clone(),
-                wallet_chain: wallet_chain_val.to_string(),
+            // 创建新用户实体
+            let new_user_entity = UserEntity {
                 id: uuid::Uuid::new_v4(),
                 username: "".to_string(),
                 nickname: Some("".to_string()),
+                wallet_address: wallet_address_val.clone(),
+                wallet_chain: wallet_chain_val.to_string(),
                 avatar_ipfs_cid: Some("".to_string()),
-                created_at: Utc::now(),
-                updated_at: Utc::now()
+                created_at: rbatis::rbdc::datetime::DateTime::now(),
+                updated_at: rbatis::rbdc::datetime::DateTime::now(),
             };
-            diesel::insert_into(users::table())
-                .values(&new_user)
-                .get_result(&mut *conn)
-                .map_err(|_| ServiceError::InternalServerError)
+            
+            // 插入新用户
+            self.db.save(&new_user_entity, &[])
+                .await
+                .map_err(|_| ServiceError::InternalServerError)?;
+            
+            // 将实体转换为User模型
+            let user = User {
+                id: new_user_entity.id,
+                username: new_user_entity.username,
+                nickname: new_user_entity.nickname,
+                wallet_address: new_user_entity.wallet_address,
+                wallet_chain: new_user_entity.wallet_chain,
+                avatar_ipfs_cid: new_user_entity.avatar_ipfs_cid,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            };
+            
+            Ok(user)
         }
     }
 
@@ -105,17 +119,36 @@ impl UserService {
         nickname: Option<String>,
         avatar_cid: Option<String>,
     ) -> Result<String, ServiceError> {
-        use crate::schema::user_profiles::dsl::{user_profiles, user_id as prof_user_id, username as prof_username};
-        let mut conn = self.db.lock().unwrap();
         if let Some(username_val) = &username {
-            let exists: bool = user_profiles
-                .filter(prof_username.eq(username_val).and(prof_user_id.ne(prof_user_id)))
-                .count()
-                .get_result::<i64>(&mut *conn)? > 0;
+            // 使用rbatis查询用户名是否已存在
+            let wrapper = self.db.new_wrapper()
+                .eq("username", username_val);
+            
+            let count = self.db.fetch_count_by_wrapper::<UserProfileEntity>(wrapper)
+                .await
+                .map_err(|_| ServiceError::InternalServerError)?;
 
-            if exists {
+            if count > 0 {
                 return Err(ServiceError::BadRequest("用户名已存在".into()));
             } else {
+                // 更新用户资料
+                let wrapper = self.db.new_wrapper()
+                    .eq("user_id", &user_id);
+                
+                let mut update_values = rbatis::py_sql::PyDict::new();
+                update_values.insert("username", username_val);
+                if let Some(nick) = &nickname {
+                    update_values.insert("nickname", nick);
+                }
+                if let Some(avatar) = &avatar_cid {
+                    update_values.insert("avatar_cid", avatar);
+                }
+                update_values.insert("updated_at", rbatis::rbdc::datetime::DateTime::now());
+                
+                self.db.update_by_wrapper::<UserProfileEntity>(&update_values, wrapper)
+                    .await
+                    .map_err(|_| ServiceError::InternalServerError)?;
+                
                 return Ok(String::from("修改成功！"))
             }
         } else {
@@ -125,56 +158,98 @@ impl UserService {
     }   
 
     /// 获取用户资料
-    pub async fn get_profile(&self, user_id: String) -> Result<UserProfile, ServiceError> {
-        use crate::schema::user_profiles::dsl::*;
-        let mut conn = self.db.lock().unwrap();
+    pub async fn get_profile(&self, user_id_val: String) -> Result<UserProfile, ServiceError> {
+        // 使用rbatis查询用户资料
+        let wrapper = self.db.new_wrapper()
+            .eq("user_id", &user_id_val);
         
-        user_profiles
-            .filter(user_id.eq(user_id))
-            .select((id, user_id, username, nickname, avatar_cid, created_at, updated_at))
-            .first::<UserProfile>(&mut *conn)
-            .optional()?
-            .ok_or(ServiceError::NotFound("用户资料不存在".into()))
+        let profile = self.db.fetch_by_wrapper::<UserProfileEntity>(wrapper)
+            .await
+            .map_err(|_| ServiceError::InternalServerError)?
+            .ok_or(ServiceError::NotFound("用户资料不存在".into()))?;
+        
+        // 将实体转换为UserProfile模型
+        let user_profile = UserProfile {
+            id: profile.id,
+            user_id: profile.user_id,
+            username: profile.username,
+            nickname: profile.nickname,
+            wallet_address: profile.wallet_address,
+            avatar_cid: profile.avatar_cid,
+            created_at: profile.created_at.into(),
+            updated_at: profile.updated_at.into(),
+        };
+        
+        Ok(user_profile)
     }
 
     /// 通过用户名获取用户资料
-    pub async fn get_profile_by_username(&self, username: &str) -> Result<UserProfile, ServiceError> {
-        use crate::schema::user_profiles::dsl::*;
-        let mut conn = self.db.lock().unwrap();
+    pub async fn get_profile_by_username(&self, username_val: &str) -> Result<UserProfile, ServiceError> {
+        // 使用rbatis查询用户资料
+        let wrapper = self.db.new_wrapper()
+            .eq("username", username_val);
         
-        user_profiles
-            .filter(username.eq(username))
-            .select((id, user_id, username, nickname, avatar_cid, created_at, updated_at))  
-            .first::<UserProfile>(&mut *conn)
-            .optional()?
-            .ok_or(ServiceError::NotFound("用户资料不存在".into()))
+        let profile = self.db.fetch_by_wrapper::<UserProfileEntity>(wrapper)
+            .await
+            .map_err(|_| ServiceError::InternalServerError)?
+            .ok_or(ServiceError::NotFound("用户资料不存在".into()))?;
+        
+        // 将实体转换为UserProfile模型
+        let user_profile = UserProfile {
+            id: profile.id,
+            user_id: profile.user_id,
+            username: profile.username,
+            nickname: profile.nickname,
+            wallet_address: profile.wallet_address,
+            avatar_cid: profile.avatar_cid,
+            created_at: profile.created_at.into(),
+            updated_at: profile.updated_at.into(),
+        };
+        
+        Ok(user_profile)
     }
 
     /// 通过钱包地址获取用户资料
-    pub async fn get_profile_by_wallet(&self, wallet_address: &str) -> Result<UserProfile, ServiceError> {
-        use crate::schema::user_profiles::dsl::*;
-        let mut conn = self.db.lock().unwrap();
+    pub async fn get_profile_by_wallet(&self, wallet_address_val: &str) -> Result<UserProfile, ServiceError> {
+        // 使用rbatis查询用户资料
+        let wrapper = self.db.new_wrapper()
+            .eq("wallet_address", wallet_address_val);
         
-        user_profiles
-            .filter(wallet_address.eq(wallet_address))
-            .select((id, user_id, username, nickname, avatar_cid, created_at, updated_at)) // 明确选择字段
-            .first::<UserProfile>(&mut *conn)
-            .optional()?
-            .ok_or(ServiceError::NotFound("用户资料不存在".into()))
+        let profile = self.db.fetch_by_wrapper::<UserProfileEntity>(wrapper)
+            .await
+            .map_err(|_| ServiceError::InternalServerError)?
+            .ok_or(ServiceError::NotFound("用户资料不存在".into()))?;
+        
+        // 将实体转换为UserProfile模型
+        let user_profile = UserProfile {
+            id: profile.id,
+            user_id: profile.user_id,
+            username: profile.username,
+            nickname: profile.nickname,
+            wallet_address: profile.wallet_address,
+            avatar_cid: profile.avatar_cid,
+            created_at: profile.created_at.into(),
+            updated_at: profile.updated_at.into(),
+        };
+        
+        Ok(user_profile)
     }
                                                                                                                                                                   
     /// 通过用户ID获取钱包地址
     pub async fn get_wallet_address_by_user_id(&self, user_id_val: String) -> Result<String, ServiceError> {
-        use crate::schema::users::dsl::*;
-        let mut conn = self.db.lock().unwrap();
+        // 解析UUID
+        let user_id_uuid = uuid::Uuid::parse_str(&user_id_val)
+            .map_err(|_| ServiceError::BadRequest("无效的用户ID".into()))?;
         
-        let user_wallet_address: String = 
-        users.filter(id.eq(user_id_val))
-            .select(wallet_address)
-            .first::<String>(&mut *conn)
-            .optional()?
+        // 使用rbatis查询用户
+        let wrapper = self.db.new_wrapper()
+            .eq("id", user_id_uuid);
+        
+        let user = self.db.fetch_by_wrapper::<UserEntity>(wrapper)
+            .await
+            .map_err(|_| ServiceError::InternalServerError)?
             .ok_or(ServiceError::NotFound("用户不存在".into()))?;
-
-        Ok(user_wallet_address)
+        
+        Ok(user.wallet_address)
     }
-} 
+}

@@ -1,13 +1,10 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use diesel::prelude::*;
-use diesel::Queryable;
-use diesel::Insertable;
-use crate::schema::comments; // 假设你的表名是 comments
 
-#[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
-#[diesel(table_name = comments)]
+
+#[derive(Debug, Serialize, Deserialize)]
+#[crud_table(table_name:"comments")]
 pub struct Comment {
     pub id: Uuid,
     pub post_id: Uuid,
@@ -91,4 +88,4 @@ impl Comment {
             replies,
         }
     }
-} 
+}

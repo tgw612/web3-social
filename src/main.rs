@@ -2,8 +2,6 @@ use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
 use dotenv::dotenv;
 use log::info;
-use diesel::prelude::*;
-use diesel::r2d2::{self, ConnectionManager};
 use std::env;
 use std::sync::Arc;
 
@@ -17,9 +15,7 @@ mod middlewares;
 mod models;
 mod services;
 mod utils;
-pub mod schema;
 
-type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -33,12 +29,7 @@ async fn main() -> std::io::Result<()> {
     let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
     let server_url = format!("{}:{}", host, port);
     
-    // 创建数据库连接池
-    let manager = ConnectionManager::<PgConnection>::new(database_url.clone());
-    let pool = r2d2::Pool::builder()
-        .build(manager)
-        .expect("Failed to create pool");
-        
+
     // 初始化Rbatis连接池
     let rb = rbatis_config::init_rbatis(&database_url).await;
     
@@ -61,7 +52,6 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(middleware::Logger::default())
             .wrap(cors)
-            .app_data(web::Data::new(pool.clone()))
             .app_data(redis_pool.clone())
             .app_data(web::Data::new(rb.clone()))
             // 注册API路由

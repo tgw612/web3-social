@@ -4,6 +4,7 @@ use std::sync::Arc;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use rbatis::rbatis::Rbatis;
 
 /// 存储服务，处理IPFS和Arweave去中心化存储
 pub struct StorageService {
@@ -162,4 +163,4 @@ impl StorageService {
     pub fn get_arweave_url(&self, id: &str) -> String {
         format!("{}/{}", self.config.arweave.gateway_url, id)
     }
-} 
+}

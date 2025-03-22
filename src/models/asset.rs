@@ -2,16 +2,17 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Asset {
-    pub chain: String,           // ETH, SOL, etc.
-    pub token_address: String,   // 代币合约地址，原生代币为空字符串
-    pub symbol: String,          // 代币符号
-    pub name: String,            // 代币名称
-    pub decimals: u8,            // 代币精度
-    pub balance: String,         // 原始余额（字符串格式，避免精度问题）
-    pub balance_usd: f64,        // USD价值
-    pub price_usd: f64,          // 单价（USD）
-    pub token_type: String,      // NATIVE, ERC20, SPL
-    pub logo_url: Option<String>, // 代币Logo URL
+    pub chain_id: i32,
+    pub asset_type: String,
+    pub symbol: String,
+    pub name: String,
+    pub contract_address: Option<String>,
+    pub balance: Option<f64>,
+    pub decimals: Option<u8>,
+    pub price_usd: Option<f64>,
+    pub value_usd: Option<f64>,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -72,4 +73,4 @@ pub struct TransactionVerification {
     pub block_number: u64,
     pub status: String, // "success", "pending", "failed"
     pub chain: String,
-} 
+}

@@ -1,13 +1,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use diesel::prelude::*;
-use diesel::Queryable;
-use diesel::Insertable;
 use uuid::Uuid;
-use crate::schema::posts; // 假设你的表名是 posts
 
-#[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
-#[diesel(table_name = posts)]
+#[derive(Debug, Serialize, Deserialize)]
+#[crud_table(table_name:"posts")]
 pub struct Post {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -118,4 +114,4 @@ impl Post {
             user_liked,
         }
     }
-} 
+}

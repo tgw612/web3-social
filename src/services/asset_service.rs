@@ -4,7 +4,6 @@ use crate::models::asset::{Asset, AssetType, TokenBalance, NftAsset};
 use crate::models::rbatis_entities::{AssetEntity, NftAssetEntity};
 use crate::utils::error::ServiceError;
 use ethers::prelude::*;
-use rbatis::crud::CRUD;
 use rbatis::rbatis::Rbatis;
 use std::sync::Arc;
 use redis::Client as RedisClient;
@@ -54,18 +53,18 @@ impl AssetService {
             .map_err(|_| ServiceError::InternalServerError)?;
             
         // 将AssetEntity转换为Asset
-        let assets = entities.into_iter().map(|e| Asset {
-            chain_id: e.chain_id,
-            asset_type: e.asset_type,
+        let assets: Vec<Asset> = entities.into_iter().map(|e| Asset {
             symbol: e.symbol,
             name: e.name,
-            contract_address: e.contract_address,
             balance: e.balance,
-            decimals: e.decimals.map(|d| d as u8).unwrap_or(0),
+            decimals: e.decimals.map(|d| d as u8),
             price_usd: e.price_usd,
             value_usd: e.value_usd,
-            created_at: e.created_at.map(|dt| dt.into()),
-            updated_at: e.updated_at.map(|dt| dt.into()),
+            chain_id: e.chain_id,
+            asset_type: e.asset_type.clone(),
+            contract_address: e.contract_address.clone(),
+            created_at: e.created_at.clone(),
+            updated_at: e.updated_at.clone(),
         }).collect();
 
         Ok(assets)
@@ -223,8 +222,8 @@ impl AssetService {
             name: e.name,
             image_url: e.image_url,
             metadata_url: e.metadata_url,
-            created_at: e.created_at.map(|dt| dt.into()),
-            updated_at: e.updated_at.map(|dt| dt.into()),
+            created_at: e.created_at.map(Into::into),
+            updated_at: e.updated_at.map(Into::into),
         }).collect();
 
         if nfts.is_empty() {
@@ -288,13 +287,19 @@ impl AssetService {
     /// 获取用户资产总价值（美元）
     pub async fn get_total_value(&self, wallet_address: &str) -> Result<f64, ServiceError> {
         // 使用rbatis执行原生SQL查询获取总价值
-        let sql = r#"SELECT SUM(value_usd) as total FROM assets WHERE wallet_address = ?"
-            .to_string();
+        let sql = "SELECT COALESCE(SUM(value_usd), 0) FROM assets WHERE wallet_address = ?".to_string();
         
-        let total: Option<f64> = self.db.query_decode(&sql, vec![rbs::to_value!(wallet_address)])
+        let total: Option<f64> = self.db.query_decode(&sql, vec![rbs::to_value(wallet_address)])
             .await
-            .map_err(|_| ServiceError::InternalServerError)?;
-            
-        Ok(total.unwrap_or(0.0))
+            .map_err(|e| {
+                log::error!("获取资产总价值失败: {}", e);
+                ServiceError::InternalServerError
+            })?;
+        
+        // 处理空值并保留两位小数
+        let total = total.unwrap_or(0.0);
+        let total = (total * 100.0).round() / 100.0;
+        Ok(total)
     }
+    
 }

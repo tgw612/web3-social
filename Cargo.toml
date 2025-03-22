@@ -23,9 +23,10 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 # 数据库
-diesel = { version = "2.1.0", features = ["postgres", "r2d2", "chrono", "uuid"] }
-rbatis = { version = "4.3", features = ["postgres", "tokio-runtime"] }
-rbs = "4.3"
+rbatis = { version = "4.5.50"}
+rbs = { version = "4.5"}
+rbdc = { version = "4.5", default-features = false,  optional = true }
+fastdate = { version = "0.3" }
 
 # Web3相关
 ethers = { version = "2.0.13", features = ["rustls"] }
@@ -36,7 +37,7 @@ ethers-signers = "2.0.0"
 
 
 # 加密和安全
-jsonwebtoken = "8.3"
+jsonwebtoken = "9.3.1"
 sha2 = "0.10"
 hex = "0.4"
 rand = "0.9.0"
@@ -50,9 +51,9 @@ redis = { version = "0.23.0", features = ["tokio-comp"] }
 
 # 日志和配置
 log = "0.4"
-env_logger = "0.10"
+env_logger = "0.11.7"
 dotenv = "0.15"
-config = "0.13"
+config = "0.15.11"
 
 # 实用工具
 chrono = { version = "0.4", features = ["serde"] }
