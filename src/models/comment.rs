@@ -4,7 +4,6 @@ use uuid::Uuid;
 
 
 #[derive(Debug, Serialize, Deserialize)]
-#[crud_table(table_name:"comments")]
 pub struct Comment {
     pub id: Uuid,
     pub post_id: Uuid,

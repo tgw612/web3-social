@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
-#[crud_table(table_name:"users")]
 pub struct User {
     pub id: Uuid,
     pub username: String,
@@ -78,7 +77,6 @@ impl User {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[crud_table(table_name:"user_profiles")]
 pub struct UserProfile {
     pub id: i32,
     pub user_id: Uuid,

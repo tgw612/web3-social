@@ -353,10 +353,10 @@ impl ContentService {
     /// 创建评论
     pub async fn create_comment(
         &self,
-        user_id: uuid::Uuid,
-        post_id: uuid::Uuid,
+        user_id: String,
+        post_id: String,
         content: &str,
-        parent_id: Option<uuid::Uuid>,
+        parent_id: Option<String>,
     ) -> Result<Comment, ServiceError> {
         // 验证帖子是否存在
         let post_wrapper = self.db.new_wrapper().eq("id", post_id);

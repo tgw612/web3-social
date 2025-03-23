@@ -1,4 +1,5 @@
-use rbatis::rbatis::Rbatis;
+
+use rbdc_sqlite::driver::SqliteDriver;
 use std::sync::Arc;
 use log::info;
 

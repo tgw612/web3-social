@@ -1,10 +1,7 @@
-use crate::blockchain::ethereum::EthClient;
-use crate::blockchain::solana::SolanaClient;
-use crate::models::asset::{Asset, AssetType, TokenBalance, NftAsset};
+use crate::models::asset::*;
 use crate::models::rbatis_entities::{AssetEntity, NftAssetEntity};
 use crate::utils::error::ServiceError;
 use ethers::prelude::*;
-use rbatis::rbatis::Rbatis;
 use std::sync::Arc;
 use redis::Client as RedisClient;
 

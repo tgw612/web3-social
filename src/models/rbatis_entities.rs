@@ -1,10 +1,8 @@
 use serde::{Deserialize, Serialize};
-use rbatis::crud;
 use rbatis::rbdc::datetime::DateTime;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[crud_table(table_name:"assets")]
 pub struct AssetEntity {
     pub wallet_address: String,
     pub chain_id: i32,
@@ -21,7 +19,6 @@ pub struct AssetEntity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[crud_table(table_name:"nft_assets")]
 pub struct NftAssetEntity {
     pub wallet_address: String,
     pub chain_id: i32,
@@ -35,7 +32,6 @@ pub struct NftAssetEntity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[crud_table(table_name:"users")]
 pub struct UserEntity {
     pub id: Uuid,
     pub username: String,
@@ -48,7 +44,6 @@ pub struct UserEntity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[crud_table(table_name:"user_profiles")]
 pub struct UserProfileEntity {
     pub id: i32,
     pub user_id: Uuid,
@@ -61,7 +56,6 @@ pub struct UserProfileEntity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[crud_table(table_name:"posts")]
 pub struct PostEntity {
     pub id: i32,
     pub user_id: Uuid,
@@ -78,7 +72,6 @@ pub struct PostEntity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[crud_table(table_name:"comments")]
 pub struct CommentEntity {
     pub id: Uuid,
     pub post_id: Uuid,
@@ -92,7 +85,6 @@ pub struct CommentEntity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[crud_table(table_name:"user_likes")]
 pub struct UserLikeEntity {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -102,7 +94,6 @@ pub struct UserLikeEntity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[crud_table(table_name:"auth_challenges")]
 pub struct AuthChallengeEntity {
     pub id: Uuid,
     pub wallet_address: String,
@@ -113,7 +104,6 @@ pub struct AuthChallengeEntity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[crud_table(table_name:"tags")]
 pub struct TagEntity {
     pub id: i32,
     pub name: String,

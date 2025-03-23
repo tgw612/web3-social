@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
-#[crud_table(table_name:"posts")]
 pub struct Post {
     pub id: Uuid,
     pub user_id: Uuid,
