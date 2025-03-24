@@ -7,7 +7,7 @@ use redis::Client as RedisClient;
 
 /// 资产服务，处理多链资产聚合和展示
 pub struct AssetService {
-    db: Arc<Rbatis>,
+    db: Arc<RBatis>,
     redis: Arc<RedisClient>,
     eth_client: Arc<EthClient>,
     solana_client: Arc<SolanaClient>,

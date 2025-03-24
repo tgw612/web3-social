@@ -1,15 +1,19 @@
-
-use rbdc_sqlite::driver::SqliteDriver;
-use std::sync::Arc;
 use log::info;
+use rbatis::RBatis;
+use std::sync::Arc;
 
 /// 初始化Rbatis连接池
-pub async fn init_rbatis(database_url: &str) -> Arc<Rbatis> {
-    let rb = Rbatis::new();
-    rb.init_opt(database_url, rbdc_pg::driver::PgDriver {}, rbatis::pool::Pool::default())
-        .await
-        .expect("Failed to connect to database");
-    
+pub async fn init_rbatis(database_url: &str) -> Arc<RBatis> {
+    let rb = RBatis::new();
+    // MySQL
+    // rb.link(rbdc_mysql::driver::MysqlDriver{}, "mysql://root:123456@localhost:3306/test").await.unwrap();
+    // PostgreSQL
+    rb.link(
+        rbdc_pg::driver::PgDriver {},
+        "postgres://postgres:123456@localhost:5432/postgres",
+    )
+    .await
+    .unwrap();
     info!("Rbatis initialized successfully");
     Arc::new(rb)
 }
