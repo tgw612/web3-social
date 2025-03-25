@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
 use rbatis::rbdc::datetime::DateTime;
 use uuid::Uuid;
+use rbatis::crud;
 
+// 为User结构体自动生成CRUD方法
+// 如果指定了表名，则使用指定的表名；否则，使用结构体名称的蛇形命名法作为表名
+crud!(AssetEntity {}); // 表名为user
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetEntity {
     pub wallet_address: String,
@@ -19,6 +23,7 @@ pub struct AssetEntity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+crud!(NftAssetEntity {}); 
 pub struct NftAssetEntity {
     pub wallet_address: String,
     pub chain_id: i32,
@@ -30,7 +35,7 @@ pub struct NftAssetEntity {
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }
-
+crud!(UserEntity {}); 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserEntity {
     pub id: Uuid,
@@ -42,7 +47,7 @@ pub struct UserEntity {
     pub created_at: DateTime,
     pub updated_at: DateTime,
 }
-
+crud!(UserProfileEntity {}); 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserProfileEntity {
     pub id: i32,
