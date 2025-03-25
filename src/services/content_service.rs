@@ -3,19 +3,18 @@ use crate::models::post::Post;
 use crate::models::rbatis_entities::{CommentEntity, PostEntity, TagEntity, UserLikeEntity};
 use crate::services::storage_service::StorageService;
 use crate::utils::error::ServiceError;
-use rbatis::crud::CRUD;
-use rbatis::rbatis::Rbatis;
+use rbatis::RBatis;
 use rbatis::rbdc::datetime::DateTime;
 use std::sync::Arc;
 
 /// 内容服务，处理发帖、评论、点赞等社交功能
 pub struct ContentService {
-    db: Arc<Rbatis>,
+    db: Arc<RBatis>,
     storage_service: Arc<StorageService>,
 }
 
 impl ContentService {
-    pub fn new(db: Arc<Rbatis>, storage_service: Arc<StorageService>) -> Self {
+    pub fn new(db: Arc<RBatis>, storage_service: Arc<StorageService>) -> Self {
         Self {
             db,
             storage_service,
@@ -243,7 +242,7 @@ impl ContentService {
             page_size, offset
         );
 
-        let params = vec![rbatis::rbdc::db::ExprParams::from(tag)];
+        let params = vec![rbs::to_value(tag)];
         let post_entities: Vec<PostEntity> = self
             .db
             .fetch_by_sql_with(&sql, params)

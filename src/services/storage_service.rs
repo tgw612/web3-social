@@ -4,16 +4,17 @@ use std::sync::Arc;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use rbatis::rbatis::Rbatis;
+use rbatis::RBatis;
 
 /// 存储服务，处理IPFS和Arweave去中心化存储
 pub struct StorageService {
     config: Arc<Config>,
     http_client: Client,
+    db: Option<Arc<RBatis>>,
 }
 
 impl StorageService {
-    pub fn new(config: Arc<Config>) -> Self {
+    pub fn new(config: Arc<Config>, db: Option<Arc<RBatis>>) -> Self {
         let http_client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
@@ -22,6 +23,7 @@ impl StorageService {
         Self {
             config,
             http_client,
+            db,
         }
     }
 

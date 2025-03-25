@@ -4,7 +4,7 @@ use crate::utils::error::ServiceError;
 use ethers::prelude::*;
 use std::sync::Arc;
 use redis::Client as RedisClient;
-
+use rbatis::RBatis;
 /// 资产服务，处理多链资产聚合和展示
 pub struct AssetService {
     db: Arc<RBatis>,
@@ -15,7 +15,7 @@ pub struct AssetService {
 
 impl AssetService {
     pub fn new(
-        db: Arc<Rbatis>,
+        db: Arc<RBatis>,
         redis: Arc<RedisClient>,
         eth_client: Arc<EthClient>,
         solana_client: Arc<SolanaClient>,
@@ -46,7 +46,7 @@ impl AssetService {
 
     /// 从数据库获取已缓存的资产
     async fn get_cached_assets(&self, wallet_address: &str) -> Result<Vec<Asset>, ServiceError> {
-        let entities = self.db.fetch_list_by_column::<AssetEntity, _>("wallet_address", wallet_address).await
+        let entities = self.db.query_list_by_column::<AssetEntity>("wallet_address", &wallet_address).await
             .map_err(|_| ServiceError::InternalServerError)?;
             
         // 将AssetEntity转换为Asset
@@ -158,7 +158,7 @@ impl AssetService {
     /// 保存资产到数据库
     async fn save_asset(&self, wallet_address: &str, asset: &Asset) -> Result<(), ServiceError> {
         // 检查资产是否已存在
-        let existing = self.db.fetch_by_column::<Option<AssetEntity>, _>("wallet_address", wallet_address)
+        let existing = self.db.query_by_column::<Option<AssetEntity>>("wallet_address", &wallet_address)
             .await
             .map_err(|_| ServiceError::InternalServerError)?;
             
@@ -180,7 +180,7 @@ impl AssetService {
         
         if existing.is_some() {
             // 更新现有记录
-            self.db.update_by_column::<AssetEntity>("wallet_address", &entity)
+            self.db.update_by_column::<AssetEntity>(&entity, "wallet_address")
                 .await
                 .map_err(|_| ServiceError::InternalServerError)?;
         } else {
@@ -207,7 +207,7 @@ impl AssetService {
 
     /// 获取用户NFT资产
     pub async fn get_user_nfts(&self, wallet_address: &str) -> Result<Vec<NftAsset>, ServiceError> {
-        let entities = self.db.fetch_list_by_column::<NftAssetEntity, _>("wallet_address", wallet_address)
+        let entities = self.db.query_list_by_column::<NftAssetEntity>("wallet_address", &wallet_address)
             .await
             .map_err(|_| ServiceError::InternalServerError)?;
             
@@ -249,7 +249,7 @@ impl AssetService {
     /// 保存NFT到数据库
     async fn save_nft(&self, wallet_address: &str, nft: &NftAsset) -> Result<(), ServiceError> {
         // 检查NFT是否已存在
-        let existing = self.db.fetch_by_column::<Option<NftAssetEntity>, _>("wallet_address", wallet_address)
+        let existing = self.db.query_by_column::<Option<NftAssetEntity>>("wallet_address", &wallet_address)
             .await
             .map_err(|_| ServiceError::InternalServerError)?;
             
@@ -268,7 +268,7 @@ impl AssetService {
         
         if existing.is_some() {
             // 更新现有记录
-            self.db.update_by_column::<NftAssetEntity>("wallet_address", &entity)
+            self.db.update_by_column::<NftAssetEntity>(&entity, "wallet_address")
                 .await
                 .map_err(|_| ServiceError::InternalServerError)?;
         } else {

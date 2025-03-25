@@ -2,14 +2,14 @@ use crate::{models::user::{User, UserProfile}, utils::error::ServiceError};
 use crate::utils::jwt;
 use crate::models::rbatis_entities::{UserEntity, UserProfileEntity};
 use std::sync::Arc;
-
+use rbatis::RBatis;
 /// 用户服务，处理用户身份和资料管理
 pub struct UserService {
-    db: Arc<Rbatis>,
+    db: Arc<RBatis>,
 }
 
 impl UserService {
-    pub fn new(db: Arc<Rbatis>) -> Self {
+    pub fn new(db: Arc<RBatis>) -> Self {
         Self { db }
     }
 
@@ -59,7 +59,7 @@ impl UserService {
     /// 查找或创建用户
     async fn find_or_create_user(&self, wallet_address_val: &String, wallet_chain_val: &str) -> Result<User, ServiceError> {
         // 使用rbatis查询用户
-        let user_entity = self.db.fetch_by_column::<UserEntity, _>("wallet_address", wallet_address_val)
+        let user_entity = self.db.query_by_column::<UserEntity>("wallet_address", wallet_address_val)
             .await
             .map_err(|e| ServiceError::InternalServerError)?;
         
@@ -124,7 +124,7 @@ impl UserService {
             let wrapper = self.db.new_wrapper()
                 .eq("username", username_val);
             
-            let count = self.db.fetch_count_by_wrapper::<UserProfileEntity>(wrapper)
+            let count = self.db.query_count_by_wrapper::<UserProfileEntity>(wrapper)
                 .await
                 .map_err(|_| ServiceError::InternalServerError)?;
 
@@ -163,7 +163,7 @@ impl UserService {
         let wrapper = self.db.new_wrapper()
             .eq("user_id", &user_id_val);
         
-        let profile = self.db.fetch_by_wrapper::<UserProfileEntity>(wrapper)
+        let profile = self.db.query_by_wrapper::<UserProfileEntity>(wrapper)
             .await
             .map_err(|_| ServiceError::InternalServerError)?
             .ok_or(ServiceError::NotFound("用户资料不存在".into()))?;
@@ -189,7 +189,7 @@ impl UserService {
         let wrapper = self.db.new_wrapper()
             .eq("username", username_val);
         
-        let profile = self.db.fetch_by_wrapper::<UserProfileEntity>(wrapper)
+        let profile = self.db.query_by_wrapper::<UserProfileEntity>(wrapper)
             .await
             .map_err(|_| ServiceError::InternalServerError)?
             .ok_or(ServiceError::NotFound("用户资料不存在".into()))?;
@@ -215,7 +215,7 @@ impl UserService {
         let wrapper = self.db.new_wrapper()
             .eq("wallet_address", wallet_address_val);
         
-        let profile = self.db.fetch_by_wrapper::<UserProfileEntity>(wrapper)
+        let profile = self.db.query_by_wrapper::<UserProfileEntity>(wrapper)
             .await
             .map_err(|_| ServiceError::InternalServerError)?
             .ok_or(ServiceError::NotFound("用户资料不存在".into()))?;
@@ -245,7 +245,7 @@ impl UserService {
         let wrapper = self.db.new_wrapper()
             .eq("id", user_id_uuid);
         
-        let user = self.db.fetch_by_wrapper::<UserEntity>(wrapper)
+        let user_entity = self.db.fetch_by_wrapper::<UserEntity>(wrapper)
             .await
             .map_err(|_| ServiceError::InternalServerError)?
             .ok_or(ServiceError::NotFound("用户不存在".into()))?;
