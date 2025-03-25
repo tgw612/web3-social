@@ -21,9 +21,8 @@ pub struct AssetEntity {
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }
-
+crud!(NftAssetEntity {});
 #[derive(Debug, Clone, Serialize, Deserialize)]
-crud!(NftAssetEntity {}); 
 pub struct NftAssetEntity {
     pub wallet_address: String,
     pub chain_id: i32,
@@ -59,7 +58,7 @@ pub struct UserProfileEntity {
     pub created_at: DateTime,
     pub updated_at: DateTime,
 }
-
+crud!(PostEntity {});
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PostEntity {
     pub id: i32,
@@ -76,6 +75,7 @@ pub struct PostEntity {
     pub updated_at: DateTime,
 }
 
+crud!(CommentEntity {});
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommentEntity {
     pub id: Uuid,
@@ -89,6 +89,7 @@ pub struct CommentEntity {
     pub updated_at: DateTime,
 }
 
+crud!(UserLikeEntity {});
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserLikeEntity {
     pub id: Uuid,
@@ -98,6 +99,7 @@ pub struct UserLikeEntity {
     pub created_at: DateTime,
 }
 
+crud!(AuthChallengeEntity {});
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthChallengeEntity {
     pub id: Uuid,
@@ -108,6 +110,7 @@ pub struct AuthChallengeEntity {
     pub expires_at: DateTime,
 }
 
+crud!(TagEntity {});
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TagEntity {
     pub id: i32,

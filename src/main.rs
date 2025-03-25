@@ -3,7 +3,6 @@ use actix_web::{middleware, web, App, HttpServer};
 use dotenv::dotenv;
 use log::info;
 use std::env;
-use std::sync::Arc;
 
 // 导入rbatis配置
 mod config;
