@@ -1,8 +1,8 @@
 pub mod auth;
 pub mod user;
-pub mod asset;
-pub mod post;
-pub mod comment;
+// pub mod asset;
+// pub mod post;
+// pub mod comment;
 
 use actix_web::{HttpResponse, web};
 
@@ -19,9 +19,9 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     // 配置所有API路由
     auth::config(cfg);
     user::config(cfg);
-    asset::config(cfg);
-    post::config(cfg);
-    comment::config(cfg);
+    // asset::config(cfg);
+    // post::config(cfg);
+    // comment::config(cfg);
     
     // 添加默认404处理
     cfg.default_service(web::route().to(not_found));

@@ -7,7 +7,6 @@ use redis::{AsyncCommands, Client};
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
-use std::time::Duration;
 
 // 速率限制中间件
 pub struct RateLimit {

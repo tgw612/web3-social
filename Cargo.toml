@@ -67,7 +67,7 @@ async-trait = "0.1"
 futures = "0.3"
 thiserror = "1.0"
 lazy_static = "1.4"
-base64 = "0.21.0"
+base64 = "0.22.1"
 
 # 可选：AI内容过滤
 rust-bert = "0.20.0"

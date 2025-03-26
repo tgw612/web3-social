@@ -55,9 +55,9 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(rb.clone()))
             // 注册API路由
             .configure(api::user::config)
-            .configure(api::asset::config)
-            .configure(api::post::config)
-            .configure(api::comment::config)
+            // .configure(api::asset::config)
+            // .configure(api::post::config)
+            // .configure(api::comment::config)
             .configure(api::auth::config)
             // 默认404处理
             .default_service(web::route().to(api::not_found))

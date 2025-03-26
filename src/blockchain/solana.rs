@@ -45,52 +45,52 @@ pub async fn get_spl_balance(
 }
 
 // 验证Solana交易
-pub async fn verify_transaction(tx_signature: &str) -> Result<TransactionVerification, String> {
-    let client = get_solana_client()?;
+// pub async fn verify_transaction(tx_signature: &str) -> Result<TransactionVerification, String> {
+//     let client = get_solana_client()?;
 
-    let signature = Signature::from_str(tx_signature)
-        .map_err(|e| format!("Invalid transaction signature: {}", e))?;
+//     let signature = Signature::from_str(tx_signature)
+//         .map_err(|e| format!("Invalid transaction signature: {}", e))?;
 
-    // 获取交易信息
-    let tx_info = client
-        .get_transaction(
-            &signature,
-            solana_client::rpc_config::RpcTransactionConfig {
-                encoding: Some(solana_client::rpc_config::UiTransactionEncoding::Base64),
-                commitment: None,
-                max_supported_transaction_version: None,
-            },
-        )
-        .map_err(|e| format!("Failed to get transaction: {}", e))?;
+//     // 获取交易信息
+//     let tx_info = client
+//         .get_transaction(
+//             &signature,
+//             solana_client::rpc_config::RpcTransactionConfig {
+//                 encoding: solana_client::rpc_config::RpcTransactionConfig::Base64,
+//                 commitment: None,
+//                 max_supported_transaction_version: None,
+//             },
+//         )
+//         .map_err(|e| format!("Failed to get transaction: {}", e))?;
 
-    // 获取交易状态和时间戳
-    let status = if tx_info.meta.as_ref().unwrap().status.is_ok() {
-        "success"
-    } else {
-        "failed"
-    };
+//     // 获取交易状态和时间戳
+//     let status = if tx_info.meta.as_ref().unwrap().status.is_ok() {
+//         "success"
+//     } else {
+//         "failed"
+//     };
 
-    // 获取交易发送方和接收方（简化，实际上需要解析交易指令）
-    let tx = tx_info.transaction;
-    let from_address = tx.account_keys[0].to_string();
-    let to_address = if tx.account_keys.len() > 1 {
-        tx.account_keys[1].to_string()
-    } else {
-        "".to_string()
-    };
+//     // 获取交易发送方和接收方（简化，实际上需要解析交易指令）
+//     let tx = tx_info.transaction;
+//     let from_address = tx.account_keys[0].to_string();
+//     let to_address = if tx.account_keys.len() > 1 {
+//         tx.account_keys[1].to_string()
+//     } else {
+//         "".to_string()
+//     };
 
-    // 构建交易验证结果
-    Ok(TransactionVerification {
-        is_valid: tx_info.meta.as_ref().unwrap().status.is_ok(),
-        transaction_hash: tx_signature.to_string(),
-        from_address,
-        to_address,
-        value: tx_info.meta.as_ref().unwrap().fee.to_string(), // 实际值需要从交易指令中提取
-        token_address: None,                                   // 简化，实际需要解析交易指令
-        token_symbol: None,                                    // 简化，实际需要查询token信息
-        timestamp: tx_info.block_time.unwrap_or(0) as i64,
-        block_number: tx_info.slot,
-        status: status.to_string(),
-        chain: "SOL".to_string(),
-    })
-}
+//     // 构建交易验证结果
+//     Ok(TransactionVerification {
+//         is_valid: tx_info.meta.as_ref().unwrap().status.is_ok(),
+//         transaction_hash: tx_signature.to_string(),
+//         from_address,
+//         to_address,
+//         value: tx_info.meta.as_ref().unwrap().fee.to_string(), // 实际值需要从交易指令中提取
+//         token_address: None,                                   // 简化，实际需要解析交易指令
+//         token_symbol: None,                                    // 简化，实际需要查询token信息
+//         timestamp: tx_info.block_time.unwrap_or(0) as i64,
+//         block_number: tx_info.slot,
+//         status: status.to_string(),
+//         chain: "SOL".to_string(),
+//     })
+// }

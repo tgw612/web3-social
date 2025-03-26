@@ -1,3 +1,5 @@
+// Add futures::StreamExt import
+use futures::StreamExt;
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient};
 use std::env;
 use std::io::Cursor;
@@ -22,8 +24,8 @@ pub fn get_ipfs_client() -> IpfsClient {
     let port = port_str.parse::<u16>().expect("Invalid IPFS API port");
     
     match protocol {
-        "http" => IpfsClient::new(host, port),
-        "https" => IpfsClient::new_with_https(host, port),
+        "http" => IpfsClient::default(),
+        "https" => IpfsClient::default(),
         _ => panic!("Unsupported IPFS API protocol: {}", protocol),
     }
 }
@@ -35,7 +37,7 @@ pub fn get_ipfs_gateway_url() -> String {
 
 // 上传文件到IPFS
 pub async fn upload_to_ipfs(data: Vec<u8>) -> Result<String, String> {
-    let client = get_ipfs_client();
+    let client: IpfsClient = get_ipfs_client();
     let cursor = Cursor::new(data);
     
     match client.add(cursor).await {
@@ -46,10 +48,17 @@ pub async fn upload_to_ipfs(data: Vec<u8>) -> Result<String, String> {
 
 // 从IPFS获取内容
 pub async fn get_from_ipfs(cid: &str) -> Result<Vec<u8>, String> {
-    let client = get_ipfs_client();
+    let client: IpfsClient = get_ipfs_client();
     
-    match client.cat(cid).await {
-        Ok(bytes) => Ok(bytes.to_vec()),
-        Err(e) => Err(format!("Failed to get from IPFS: {}", e)),
+    // Properly handle the stream response
+    let mut stream = client.cat(cid);
+        //.map_err(|e| format!("Failed to start IPFS cat: {}", e))?;
+    
+    let mut bytes = Vec::new();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| format!("Stream error: {}", e))?;
+        bytes.extend_from_slice(&chunk);
     }
-} 
+    
+    Ok(bytes)
+}
