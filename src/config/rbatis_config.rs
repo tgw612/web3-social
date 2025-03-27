@@ -12,7 +12,7 @@ pub async fn init_rbatis(database_url:&str) -> Arc<RBatis> {
     // PostgreSQL
     rb.link(
         rbdc_pg::driver::PgDriver {},
-        "postgres://postgres:123456@localhost:5432/postgres",
+        database_url,
     )
     .await
     .unwrap();

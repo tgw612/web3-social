@@ -15,14 +15,10 @@ pub async fn not_found() -> HttpResponse {
 }
 
 // API路由配置
+// 在 main.rs 中实际调用路由配置
 pub fn config(cfg: &mut web::ServiceConfig) {
-    // 配置所有API路由
-    auth::config(cfg);
+    // 添加其他模块的路由配置
     user::config(cfg);
-    // asset::config(cfg);
-    // post::config(cfg);
-    // comment::config(cfg);
-    
-    // 添加默认404处理
-    cfg.default_service(web::route().to(not_found));
-} 
+    auth::config(cfg);
+    // ... 其他模块配置
+}

@@ -96,7 +96,7 @@ where
         // 验证JWT令牌
         let user_info: AuthenticatedUser = match jwt::validate_token(&token) {
             Ok(claims) => {
-                let user_id: String = match Uuid::parse_str(&claims.sub) {
+                let user_id = match Uuid::parse_str(&claims.sub) {
                     Ok(i) => i.to_string(),
                     Err(_) => {
                         return Box::pin(async move {
