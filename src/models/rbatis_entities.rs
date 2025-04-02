@@ -62,7 +62,7 @@ crud!(PostEntity {});
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PostEntity {
     pub id: i32,
-    pub user_id: Uuid,
+    pub user_id: String,
     pub content: String,
     pub images_ipfs_cids: Option<Vec<String>>,
     pub arweave_tx_id: Option<String>,

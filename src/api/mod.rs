@@ -1,8 +1,8 @@
 pub mod auth;
 pub mod user;
 // pub mod asset;
-// pub mod post;
-// pub mod comment;
+pub mod post;
+pub mod comment;
 
 use actix_web::{HttpResponse, web};
 
