@@ -68,7 +68,7 @@ impl UserService {
     ) -> Result<UserEntity, ServiceError> {
         // 使用self.db而不是创建新的RBatis实例
         let rb: RBatis = RBatis::new();
-        let user_entity = UserEntity::select_by_column(&rb, "wallet_address", wallet_address_val)
+        let user_entity: Option<UserEntity> = UserEntity::select_by_column(&rb, "wallet_address", wallet_address_val)
             .await
             .map_err(|_| ServiceError::InternalServerError)?
             .first()

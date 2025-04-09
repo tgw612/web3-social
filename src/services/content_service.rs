@@ -56,74 +56,51 @@ impl ContentService {
             transaction_chain: None,
             like_count: 0,
             comment_count: 0,
-            tags: Some(tags.clone()),
-            created_at: rbatis::rbdc::datetime::DateTime::now(),
-            updated_at: rbatis::rbdc::datetime::DateTime::now(),
-        };
-
-        // 保存帖子
-        // 使用insert方法保存帖子
-        PostEntity::insert(&self.db, &post_entity)
-            .await
-            .map_err(|e| ServiceError::InternalServerError(e.to_string()))?;
-
-        // 将实体转换为Post模型
-        let post = PostEntity {
-            id: post_entity.id,
-            user_id,
-            content: content.to_string(),
-            images_ipfs_cids: if let Some(cid) = image_cid {
-                Some(vec![cid])
-            } else {
-                None
-            },
-            arweave_tx_id: Some(content_id),
-            transaction_hash: tx_hash,
-            transaction_chain: None,
-            like_count: 0,
-            comment_count: 0,
             tags: Some(tags),
-            created_at: post_entity.created_at.into(),
-            updated_at: post_entity.updated_at.into(),
+            created_at: DateTime::now(),
+            updated_at: DateTime::now(),
         };
+        let rb: RBatis = RBatis::new();
+        // 保存帖子
+        PostEntity::insert(&rb, &post_entity)
+            .await
+            .map_err(|_| ServiceError::InternalServerError)?;
 
-        Ok(post)
+        Ok(post_entity)
     }
 
     /// 获取或创建标签
     async fn get_or_create_tag(&self, tag_name: &str) -> Result<i32, ServiceError> {
         // 使用select_by_column方法查询标签
-        let tag = TagEntity::select_by_column(&self.db, "name", tag_name)
+        let tag = TagEntity::select_by_column(&rb, "name", tag_name)
             .await
             .map_err(|_| ServiceError::InternalServerError)?
             .first()
             .cloned();
-
+        let rb: RBatis = RBatis::new();
         if let Some(tag) = tag {
             Ok(tag.id)
         } else {
             // 创建新标签
-            let new_tag = TagEntity {
+            let new_tag: TagEntity = TagEntity {
                 id: 0, // 数据库会自动生成ID
                 name: tag_name.to_string(),
             };
 
-            self.db
-                .save(&new_tag, &[])
+            // 使用insert方法保存标签
+            TagEntity::insert(&rb, &new_tag)
                 .await
-                .map_err(|e| ServiceError::InternalServerError(e.to_string()))?;
+                .map_err(|_| ServiceError::InternalServerError)?;
 
             // 获取新创建的标签ID
-            let wrapper = self.db.new_wrapper().eq("name", tag_name);
-
-            let new_tag = self
-                .db
-                .fetch_by_wrapper::<TagEntity>(wrapper)
+            let tag = TagEntity::select_by_column(&rb, "name", tag_name)
                 .await
                 .map_err(|_| ServiceError::InternalServerError)?
+                .first()
+                .cloned()
                 .ok_or(ServiceError::InternalServerError)?;
 
-            Ok(new_tag.id)
+            Ok(tag.id)
         }
     }
 
@@ -132,7 +109,7 @@ impl ContentService {
         &self,
         page: i32,
         page_size: i32,
-    ) -> Result<Vec<Post>, ServiceError> {
+    ) -> Result<Vec<PostEntity>, ServiceError> {
         let offset = (page - 1) * page_size;
 
         // 使用rbatis执行原生SQL查询
@@ -152,10 +129,10 @@ impl ContentService {
             .map_err(|e| ServiceError::InternalServerError(e.to_string()))?;
 
         // 将实体转换为Post模型
-        let posts = post_entities
+        let posts: Vec<PostEntity> = post_entities
             .into_iter()
-            .map(|entity| {
-                Post {
+            .map(|entity: PostEntity| {
+                PostEntity {
                     id: uuid::Uuid::new_v4(), // 这里需要根据实际情况调整
                     user_id: entity.user_id,
                     content: entity.content,
@@ -245,10 +222,10 @@ impl ContentService {
             .map_err(|e| ServiceError::InternalServerError(e.to_string()))?;
 
         // 将实体转换为Post模型
-        let posts = post_entities
+        let posts: Vec<PostEntity> = post_entities
             .into_iter()
-            .map(|entity| {
-                Post {
+            .map(|entity: PostEntity| {
+                PostEntity {
                     id: uuid::Uuid::new_v4(), // 这里需要根据实际情况调整
                     user_id: entity.user_id,
                     content: entity.content,
@@ -274,7 +251,7 @@ impl ContentService {
         user_id: String,
         page: i32,
         page_size: i32,
-    ) -> Result<Vec<Post>, ServiceError> {
+    ) -> Result<Vec<PostEntity>, ServiceError> {
         let offset = (page - 1) * page_size;
 
         // 使用rbatis查询用户帖子
@@ -294,7 +271,7 @@ impl ContentService {
         let posts = page_result
             .records
             .into_iter()
-            .map(|entity| Post {
+            .map(|entity| PostEntity {
                 id: entity.id,
                 user_id: entity.user_id,
                 content: entity.content,
@@ -314,7 +291,7 @@ impl ContentService {
     }
 
     /// 获取帖子详情
-    pub async fn get_post(&self, post_id: String) -> Result<Post, ServiceError> {
+    pub async fn get_post(&self, post_id: String) -> Result<PostEntity, ServiceError> {
         // 使用select_by_column方法查询帖子
         let entity = PostEntity::select_by_column(&self.db, "id", post_id)
             .await
@@ -324,7 +301,7 @@ impl ContentService {
             .ok_or(ServiceError::NotFound("帖子不存在".into()))?;
 
         // 将实体转换为Post模型
-        let post = Post {
+        let post = PostEntity {
             id: entity.id,
             user_id: entity.user_id,
             content: entity.content,
@@ -349,7 +326,7 @@ impl ContentService {
         post_id: String,
         content: &str,
         parent_id: Option<String>,
-    ) -> Result<Comment, ServiceError> {
+    ) -> Result<CommentEntity, ServiceError> {
         // 验证帖子是否存在
         let post_wrapper = self.db.new_wrapper().eq("id", post_id);
 
@@ -415,7 +392,7 @@ impl ContentService {
         post_id: String,
         page: i32,
         page_size: i32,
-    ) -> Result<Vec<Comment>, ServiceError> {
+    ) -> Result<Vec<CommentEntity>, ServiceError> {
         // 使用wrapper构建查询条件并按时间排序
         let wrapper = self.db
             .new_wrapper()
@@ -437,7 +414,7 @@ impl ContentService {
         comment_id: String,
         page: i32,
         page_size: i32,
-    ) -> Result<Vec<Comment>, ServiceError> {
+    ) -> Result<Vec<CommentEntity>, ServiceError> {
         // 使用rbatis查询评论回复
         let wrapper = self
             .db
@@ -455,7 +432,7 @@ impl ContentService {
     }
 
     /// 获取评论详情
-    pub async fn get_comment(&self, comment_id: String) -> Result<Comment, ServiceError> {
+    pub async fn get_comment(&self, comment_id: String) -> Result<CommentEntity, ServiceError> {
         // 使用rbatis查询评论
         let wrapper = self.db.new_wrapper().eq("id", comment_id);
 

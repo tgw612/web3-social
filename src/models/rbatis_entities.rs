@@ -79,9 +79,9 @@ crud!(CommentEntity {});
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommentEntity {
     pub id: Uuid,
-    pub post_id: Uuid,
-    pub user_id: Uuid,
-    pub parent_id: Option<Uuid>,
+    pub post_id: String,
+    pub user_id: String,
+    pub parent_id: Option<String>,
     pub content: String,
     pub arweave_tx_id: Option<String>,
     pub like_count: i32,
